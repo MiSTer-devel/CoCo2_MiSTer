@@ -2,7 +2,7 @@
 
 // todo: find a better name
 module dragoncoco(
-  input clk, // 57.272 mhz
+  input clk, // 42.954 mhz
   input turbo,
   input reset, // todo: reset doesn't work!
   input dragon,
@@ -76,6 +76,8 @@ wire VClk;
 
 reg clk_14M318_ena ;
 reg [1:0] count;
+
+
 always @(posedge clk)
 begin
 	if (~reset)
@@ -83,7 +85,7 @@ begin
 	else
 	begin
 		clk_14M318_ena <= 0;
-		if (count == 'd3)
+		if (count == 'd2)
 		begin
 		  clk_14M318_ena <= 1;
         count <= 0;
@@ -95,8 +97,28 @@ begin
 	end
 end
 
+reg clk_28M_ena ;
+reg [1:0] count2;
 
-wire clk_enable = turbo ? 1 : clk_14M318_ena;
+always @(posedge clk)
+begin
+	if (~reset)
+		count2<=0;
+	else
+	begin
+		clk_28M_ena <= 0;
+		if (count2 == 'd1)
+		begin
+		  clk_28M_ena <= 1;
+        count2 <= 0;
+		end
+		else
+		begin
+			count2<=count2+1;
+		end
+	end
+end
+wire clk_enable = turbo ? clk_28M_ena : clk_14M318_ena;
 
 
 wire [7:0] cpu_dout;
