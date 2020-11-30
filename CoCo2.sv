@@ -229,7 +229,7 @@ hps_io #(.STRLEN($size(CONF_STR)>>3)) hps_io
 
 	.buttons(buttons),
 	.status(status),
-	.status_menumask({status[5]}),
+	.status_menumask(),
 
 	.ioctl_download(ioctl_download),
 	.ioctl_wr(ioctl_wr),
@@ -453,7 +453,7 @@ reg [3:0] C_R,C_G,C_B;
 wire [159:0]DLine1;
 wire [159:0]DLine2;
 
-assign Line2= {5'h12,5'h12,5'h12,145'b0};
+
 ovo OVERLAY
 (
     .i_r(4'd0),
@@ -470,7 +470,7 @@ ovo OVERLAY
     .ena(status[11]),
 
     .in0(DLine1),
-    .in1(Line2)
+    .in1(DLine2)
 );
 
 `endif

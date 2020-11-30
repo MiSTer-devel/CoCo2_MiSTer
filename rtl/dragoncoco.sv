@@ -72,7 +72,7 @@ wire nmi = 1'b1;
 wire halt = 1'b1;
 
 wire clk_E, clk_Q;
-wire VClk;
+
 
 reg clk_14M318_ena ;
 reg [1:0] count;
@@ -134,7 +134,7 @@ wire firq;
 
 
 
-wire ram_cs,rom8_cs,romA_cs,romC_cs,io_cs,pia1_cs,pia_cs;
+wire ram_cs,rom8_cs,romA_cs,romC_cs,io_cs,pia1_cs,pia_cs,pia_orig_cs;
 
 
 wire [7:0]vdg_data;
@@ -186,9 +186,47 @@ always_comb begin
    endcase
 	
 end
+
+
+/*
+Dragon 64 has two hardware changes to access more I/O
+
+cpu_addr[2] is used as a select between the pia and the ACIA serial
+
+pia_portb_out[2] switches between the rom and alternative rom chip
+*/
+
+
+assign pia_cs = dragon64 ? pia_64_cs : pia_orig_cs ;             
+
+wire pia_64_cs= ~cpu_addr[2] & pia_orig_cs;
+wire acia_cs = cpu_addr[2] &  pia_orig_cs ;
+wire rom8_1_cs = rom8_cs & ~pia1_portb_out[2];
+wire rom8_2_cs = rom8_cs & pia1_portb_out[2];
+wire romA_1_cs = romA_cs & ~pia1_portb_out[2];
+wire romA_2_cs = romA_cs & pia1_portb_out[2];
+
+wire [7:0] cpu_din64;
+
+always_comb begin
+   unique case (1'b1)
+     ram_cs:     cpu_din64 =  ram_dout;
+     rom8_1_cs:  cpu_din64 =  rom8_64_1_2;
+     rom8_2_cs:  cpu_din64 =  rom8_64_2_2;
+     romA_1_cs:  cpu_din64 =  romA_64_1_2;
+     romA_2_cs:  cpu_din64 =  romA_64_2_2;
+     romC_cs:    cpu_din64 =  romC_dout2;
+	  acia_cs:    cpu_din64 =  acia_dout;
+     pia_cs:     cpu_din64 =  pia_dout2;
+     pia1_cs:    cpu_din64 =  pia1_dout2;
+     io_cs:      cpu_din64 =  io_out;
+     default:    cpu_din64 =  8'hff;
+   endcase
+end
+
 mc6809i cpu(
   .clk(clk),
-  .D(cpu_din),
+  .D(dragon64?cpu_din64:cpu_din),
   .DOut(cpu_dout),
   .ADDR(cpu_addr),
   .RnW(cpu_rw),
@@ -229,9 +267,8 @@ dpram #(.addr_width_g(16), .data_width_g(8)) ram1(
 
 // 8k extended basic rom
 // Do we need an option to enable/disable extended basic rom?
-assign rom8_dout = dragon ? dragon64 ? rom8_dout_dragon64 : rom8_dout_dragon : rom8_dout_tandy;
+assign rom8_dout = dragon ?   rom8_dout_dragon : rom8_dout_tandy;
 wire [7:0] rom8_dout_dragon;
-wire [7:0] rom8_dout_dragon64;
 wire [7:0] rom8_dout_tandy;
 
 rom_ext rom8(
@@ -246,15 +283,10 @@ dragon_ext rom8_D(
   .dout(rom8_dout_dragon),
   .cs(~rom8_cs)
 );
-dragon_ext64 rom8_D64(
-  .clk(clk),
-  .addr(cpu_addr[12:0]),
-  .dout(rom8_dout_dragon64),
-  .cs(~rom8_cs)
-);
-assign romA_dout = dragon ? dragon64 ? romA_dout_dragon64 : romA_dout_dragon : romA_dout_tandy;
+
+
+assign romA_dout = dragon ?  romA_dout_dragon : romA_dout_tandy;
 wire [7:0] romA_dout_dragon;
-wire [7:0] romA_dout_dragon64;
 wire [7:0] romA_dout_tandy;
 
 // 8k color basic rom
@@ -272,13 +304,57 @@ dragon_bas romA_D(
   .cs(~romA_cs )
  );
  
-dragon_bas64 romA_D64(
+
+ 
+ 
+
+//
+// Dragon 64 has two banks of 16k roms. We split them into 
+// 4 banks of 8. Not sure this is the best idea..
+// 
+reg [7:0] rom8_64_1_2;
+reg [7:0] rom8_64_2_2;
+reg [7:0] romA_64_1_2;
+reg [7:0] romA_64_2_2;
+
+wire [7:0] rom8_64_1;
+wire [7:0] rom8_64_2;
+wire [7:0] romA_64_1;
+wire [7:0] romA_64_2;
+
+ 
+dragon_ext64 rom8_D64_1(
   .clk(clk),
   .addr(cpu_addr[12:0]),
-  .dout(romA_dout_dragon64),
+  .dout(rom8_64_1),
+  .cs(~rom8_cs)
+);
+ 
+dragon_bas64 romA_D64_1(
+  .clk(clk),
+  .addr(cpu_addr[12:0]),
+  .dout(romA_64_1),
   .cs(~romA_cs )
  );
 
+dragon_alt_ext64 rom8_D64_2(
+  .clk(clk),
+  .addr(cpu_addr[12:0]),
+  .dout(rom8_64_2),
+  .cs(~rom8_cs)
+);
+ 
+dragon_alt_bas64 romA_D64_2(
+  .clk(clk),
+  .addr(cpu_addr[12:0]),
+  .dout(romA_64_2),
+  .cs(~romA_cs )
+ );
+ 
+ 
+ 
+ 
+ 
 
 // there must be another solution
 reg cart_loaded;
@@ -340,6 +416,11 @@ begin
 			rom8_dout2<=rom8_dout;
 			pia_dout2<=pia_dout;
 			pia1_dout2<=pia1_dout;
+			rom8_64_1_2<=rom8_64_1;
+			rom8_64_2_2<=rom8_64_2;
+			romA_64_1_2<=romA_64_1;
+			romA_64_2_2<=romA_64_2;
+
         end
         if (ras_n == 0 && ras_n_r == 1)
           sam_a[7:0]<= ma_ram_addr;
@@ -372,7 +453,7 @@ mc6883 sam(
 			//-- vdg signals
 			.da0(da0),
 			.hs_n(hs_n),
-			.vclk(sam_vclk),
+			.vclk(), // not sure why this clock doesn't work to put it into the video chip
 
 			//-- peripheral address selects
 			.s_device_select(s_device_select),
@@ -396,7 +477,7 @@ mc6883 sam(
 wire nc;
 wire [7:0] cs74138;
 assign {
-  nc,io_cs, pia1_cs, pia_cs,
+  nc,io_cs, pia1_cs, pia_orig_cs,
   romC_cs, romA_cs, rom8_cs,
   ram_cs
 } = cs74138;
@@ -431,7 +512,7 @@ pia6520 pia(
   .portb_out(kb_cols),
   .ca1_in(hs_n),
   .ca2_in(),
-  .cb1_in(fs_n),  // vsync? ajs instead of ca2 in?
+  .cb1_in(fs_n),  
   .cb2_in(),
   .ca2_out(sela), // used for joy & snd
   .cb2_out(selb), // used for joy & snd
@@ -458,9 +539,9 @@ pia6520 pia1(
   .irq(firq),
   .porta_in({6'd0,casdout}),
   .porta_out({dac_data,casdin0,rsout1}),
-  .portb_in(),
+  .portb_in(dragon64?8'b00000001:8'b00000000), // from dragon64 schematic 
   .portb_out(pia1_portb_out),
-  .ca1_in(),
+  .ca1_in(dragon64?1'b1:1'b0), // from dragon64 schematic - this should be held high
   .ca2_in(),
   .cb1_in(cart_loaded & reset & clk_Q), // cartridge inserted
   .cb2_in(),
@@ -492,10 +573,28 @@ assign DLine1 = {
 
 110'b0};
 
+// two is a copy of 1 for now, but we will use this for debugging
+// the disk controller
+assign DLine2 = {
+
+5'b10000,						// space
+5'b11111,						// '#'  (to mark the data)
+1'b0,pia1_portb_out[7:4],
+5'b10000,						// space
+
+5'b10101,						// '>'  (to mark the data)
+1'b0,pia1_portb_out[3:0],
+5'b10000,						// space
+
+5'b11010,						// ':'  (to mark the data)
+3'b0,ram_dout_b[7:6],
+5'b10000,						// space
+
+110'b0};
 
 mc6847pace vdg(
   .clk(clk),
-  .clk_ena(clk_enable),//VClk
+  .clk_ena(clk_enable),//VClk - vclk doesn't seem to work
   .reset(~reset),
   .da0(da0),
   .dd(ram_dout_b),
@@ -567,6 +666,12 @@ dac dac(
 
 );
 
-
+//dragon 64 has a serial module wired in based on addr[2] - this module is a stub that returns values to make things work 
+wire [7:0] acia_dout;
+acia acia (
+   .clk(clk),
+   .addr(cpu_addr[2:0]),
+   .data(acia_dout)
+  );
 
 endmodule
