@@ -259,7 +259,7 @@ pll pll
 	.locked(locked)
 );
 
-wire reset = RESET | status[0] | buttons[1] | (ioctl_download & ioctl_index == 1);
+wire reset = RESET | status[0] | buttons[1] | (ioctl_download & ioctl_index == 1) | machine_select_reset;
 
 //////////////////////////////////////////////////////////////////
 
@@ -291,12 +291,36 @@ wire [15:0] coco_ajoy2 = status[10] ? {center_joystick_x1[7:0],center_joystick_y
 wire casdout;
 wire cas_relay;
 
+reg dragon64;
+reg dragon;
+reg [1:0]machineselect_r;
+reg machine_select_reset;
+reg [3:0]reset_count;
+
+always @(posedge clk_sys)
+begin
+ machine_select_reset <=1'b0;
+ dragon64 <= (status[9:8]==2'b10);
+ dragon   <= (status[9:8]!=2'b00);
+ 
+ if (machineselect_r!=status[9:8])
+	reset_count<=4'b1111;
+
+ if (reset_count>4'b0) begin
+  reset_count<=reset_count - 4'b0001;
+  machine_select_reset<=1'b1;
+ end
+ 
+ machineselect_r<=status[9:8];
+end
+
+
 dragoncoco dragoncoco(
   .clk(clk_sys), // 50 mhz
   .turbo(status[7]&cas_relay),
   .reset(~reset),
-  .dragon(status[9:8]!=2'b00),
-  .dragon64(status[9:8]==2'b10),
+  .dragon(dragon),
+  .dragon64(dragon64),
   .red(red),
   .green(green),
   .blue(blue),

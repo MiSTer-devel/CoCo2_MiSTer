@@ -3,6 +3,7 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/dac.sv
 set_global_assignment -name VERILOG_FILE rtl/mc6809i.v
 set_global_assignment -name VERILOG_FILE rtl/pll.v
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/dragoncoco.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/acia.sv
 set_global_assignment -name VERILOG_FILE rtl/ps2.v
 set_global_assignment -name VERILOG_FILE rtl/ram.v
 set_global_assignment -name VERILOG_FILE rtl/uart_rx.v
@@ -14,6 +15,8 @@ set_global_assignment -name VERILOG_FILE roms/dragon_bas.v
 set_global_assignment -name VERILOG_FILE roms/dragon_ext.v
 set_global_assignment -name VERILOG_FILE roms/dragon_bas64.v
 set_global_assignment -name VERILOG_FILE roms/dragon_ext64.v
+set_global_assignment -name VERILOG_FILE roms/dragon_alt_bas64.v
+set_global_assignment -name VERILOG_FILE roms/dragon_alt_ext64.v
 set_global_assignment -name VERILOG_FILE roms/rom_bas.v
 set_global_assignment -name VERILOG_FILE roms/rom_chrrom.v
 set_global_assignment -name VERILOG_FILE roms/rom_ext.v
