@@ -126,7 +126,7 @@ begin
           when "0001" =>
           when "0010" =>
             -- valid VDG address (col)
-            --case m is
+            --case m_memory_size is
             --  when "00" =>
             --    z_ram_addr <= "00" & b_int(11 downto 6);
             --  when "01" =>
@@ -153,19 +153,24 @@ begin
           when "1010" =>
             -- valid MPU address (col)
             -- no need to munge any signal with RAS/CAS
-            --case m is
+            --case m_memory_size is
             --  when "00" =>
             --    z_ram_addr <= "00" & addr(11 downto 6);
             --  when "01" =>
                 -- z_ram_addr(7) is P or don't care
-            --    z_ram_addr <= p & addr(13 downto 7);
+                --z_ram_addr <= p_32k_page_switch & addr(13 downto 7);
+            --    z_ram_addr <= '0' & addr(13 downto 7);
             --  when others =>
             --    if ty_memory_map_type = '0' then
-            --      z_ram_addr <= p & addr(14 downto 8);
+            --      z_ram_addr <= p_32k_page_switch & addr(14 downto 8);
             --    else
-                  z_ram_addr <= addr(15 downto 8);
+            --      z_ram_addr <= addr(15 downto 8);
             --    end if;
             --end case;
+				
+            z_ram_addr <= addr(15 downto 8);
+
+
             cas_n <= '0';
           when "1011" =>
             clk_q <= '0';

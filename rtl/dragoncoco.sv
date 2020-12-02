@@ -380,8 +380,6 @@ dpram #(.addr_width_g(14), .data_width_g(8)) romC(
 
 
 wire [2:0] s_device_select;
-wire [15:0] sam_addr;
-reg [15:0] mem_addr;
 
 
 
