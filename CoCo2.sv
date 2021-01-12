@@ -40,8 +40,8 @@ module emu
 	output        CE_PIXEL,
 
 	//Video aspect ratio for HDMI. Most retro systems have ratio 4:3.
-	output  [7:0] VIDEO_ARX,
-	output  [7:0] VIDEO_ARY,
+	output  [11:0] VIDEO_ARX,
+	output  [11:0] VIDEO_ARY,
 
 	output  [7:0] VGA_R,
 	output  [7:0] VGA_G,
@@ -154,7 +154,6 @@ assign {SD_SCK, SD_MOSI, SD_CS} = 'Z;
 assign {SDRAM_DQ, SDRAM_A, SDRAM_BA, SDRAM_CLK, SDRAM_CKE, SDRAM_DQML, SDRAM_DQMH, SDRAM_nWE, SDRAM_nCAS, SDRAM_nRAS, SDRAM_nCS} = 'Z;
 assign {DDRAM_CLK, DDRAM_BURSTCNT, DDRAM_ADDR, DDRAM_DIN, DDRAM_BE, DDRAM_RD, DDRAM_WE} = '0;
 
-assign VGA_SL = 0;
 assign VGA_F1 = 0;
 assign VGA_SCALER = 0;
 
@@ -171,14 +170,19 @@ assign BUTTONS = 0;
 
 //////////////////////////////////////////////////////////////////
 
-assign VIDEO_ARX = status[1] ? 8'd16 : 8'd4;
-assign VIDEO_ARY = status[1] ? 8'd9  : 8'd3;
+
+wire [1:0] ar = status[18:17];
+
+assign VIDEO_ARX = (!ar) ? 12'd4 : (ar - 1'd1);
+assign VIDEO_ARY = (!ar) ? 12'd3 : 12'd0;
+
 
 `include "build_id.v"
 localparam CONF_STR = {
 	"CoCo2;;",
 	"-;",
-	"O1,Aspect ratio,4:3,16:9;",
+	"OHI,Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
+	"OFG,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;", 
 	"O4,Overscan,Hidden,Visible;",
 	"O3,Artifact,Enable,Disable;",
 	"O2,Artifact Phase,Normal,Reverse;",
@@ -217,6 +221,7 @@ wire  [7:0] ioctl_index;
 wire [31:0] joy1, joy2;
 
 wire [15:0] joya1, joya2;
+wire [21:0] gamma_bus;
 
 
 hps_io #(.STRLEN($size(CONF_STR)>>3)) hps_io
@@ -246,7 +251,9 @@ hps_io #(.STRLEN($size(CONF_STR)>>3)) hps_io
    .joystick_analog_1(joya2),
 
 
-	.ps2_key(ps2_key)
+	.ps2_key(ps2_key),
+	.gamma_bus(gamma_bus)
+
 );
 
 
@@ -464,27 +471,32 @@ cassette cassette(
 );
 
 
-reg ce_pix;
-always @(posedge clk_sys) begin
-       ce_pix <= !ce_pix;
-end
 
 assign CLK_VIDEO = clk_sys;
-assign CE_PIXEL = vclk;
-
-assign VGA_DE = ~(HBlank | VBlank);
-assign VGA_HS = HSync;
-assign VGA_VS = VSync;
-/*
-assign VGA_G  = {green,green[5:4]};
-assign VGA_R  = {red,red[4:2]};
-assign VGA_B  = {blue,blue[4:2]};
-*/
 
 
-assign VGA_R=rr;
-assign VGA_G=gg;
-assign VGA_B=bb;
+wire [1:0] scale = status[16:15];
+wire [2:0] sl = scale ? scale - 1'd1 : 3'd0;
+wire       scandoubler = (scale || forced_scandoubler);
+
+assign VGA_SL = sl[1:0];
+
+
+video_mixer #(.LINE_LENGTH(380), .GAMMA(1)) video_mixer
+(
+	.*,
+
+	.clk_vid(CLK_VIDEO),
+	.ce_pix_out(CE_PIXEL),
+   .ce_pix(vclk),
+	.scanlines(0),
+	.hq2x(scale==1),
+	.mono(0),
+	.R(rr),
+	.G(gg),
+	.B(bb)
+	
+);
 
 
 `ifdef USE_OVERLAY
