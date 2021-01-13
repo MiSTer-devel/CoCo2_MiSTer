@@ -171,7 +171,7 @@ assign BUTTONS = 0;
 //////////////////////////////////////////////////////////////////
 
 
-wire [1:0] ar = status[18:17];
+wire [1:0] ar = status[20:19];
 
 assign VIDEO_ARX = (!ar) ? 12'd4 : (ar - 1'd1);
 assign VIDEO_ARY = (!ar) ? 12'd3 : 12'd0;
@@ -181,8 +181,8 @@ assign VIDEO_ARY = (!ar) ? 12'd3 : 12'd0;
 localparam CONF_STR = {
 	"CoCo2;;",
 	"-;",
-	"OHI,Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
-	"OFG,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;", 
+	"OJK,Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
+	"OFH,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;", 
 	"O4,Overscan,Hidden,Visible;",
 	"O3,Artifact,Enable,Disable;",
 	"O2,Artifact Phase,Normal,Reverse;",
@@ -475,7 +475,7 @@ cassette cassette(
 assign CLK_VIDEO = clk_sys;
 
 
-wire [1:0] scale = status[16:15];
+wire [2:0] scale = status[17:15];
 wire [2:0] sl = scale ? scale - 1'd1 : 3'd0;
 wire       scandoubler = (scale || forced_scandoubler);
 
