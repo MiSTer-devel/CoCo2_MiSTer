@@ -16,10 +16,11 @@ input clk,
   input [15:0] joya1,
   input [15:0] joya2,
   input [5:0] dac,
+  input [11:0] cass_snd,
   input snden,
   input snd,
   output reg hilo,
-  output reg [5:0] sound,
+  output reg [11:0] sound,
   input selb,
   input sela
   );
@@ -38,10 +39,13 @@ Sel B Sel A  joystick input sound Input
 // page 43 COCO2 NTSC Service Manual
 always @(posedge clk) begin
   if (snden && !selb && !sela) begin
-    sound<=dac;
+    sound<= { dac, 6'b0 };
+	 end
+  else   if (snden && !selb && sela) begin
+    sound<=cass_snd[11:0];
 	 end
   else begin
-    sound<=6'b0;
+    sound<=11'b0;
   end
 end
 always @(posedge clk) begin

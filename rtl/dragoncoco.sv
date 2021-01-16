@@ -55,7 +55,8 @@ module dragoncoco(
   output cas_relay,
   
   // sound
-  output [5:0] sound,
+  input [11:0] cass_snd,
+  output [11:0] sound,
   output sndout,
   
   // debug for video overlay
@@ -655,6 +656,7 @@ dac dac(
 .joya1(joya1),
 .joya2(joya2),
 .dac(dac_data),
+.cass_snd(cass_snd),
 .snden(snden),
 .snd(),
 .hilo(hilo),
