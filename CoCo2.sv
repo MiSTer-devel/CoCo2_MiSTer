@@ -161,7 +161,14 @@ assign AUDIO_S = 0;
 assign AUDIO_L = AUDIO_R;
 assign AUDIO_R = sound_pad;
 wire sndout;
-wire [15:0] sound_pad =  {sndout,sound,status[12] ? adc_cassette_bit : casdout,8'b0};
+
+// sound is mixed:
+//
+// sndout (1-bit sound) is loudest
+// sound is next (12-bit sound from ADC - or top 6 bits is DAC)
+// if the user chose to monitor the cassette sound, it it mixed in as a single bit at a low level
+//
+wire [15:0] sound_pad =  {sndout,sound[11:6], sound[5] ^ (status[13] ? (status[12] ? adc_cassette_bit : casdout) : 1'b0), sound[4:0], 3'b0};
 assign AUDIO_MIX = 0;
 
 assign LED_DISK = 0;
@@ -181,26 +188,30 @@ assign VIDEO_ARY = (!ar) ? 12'd3 : 12'd0;
 localparam CONF_STR = {
 	"CoCo2;;",
 	"-;",
-	"OJK,Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
-	"OFH,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;", 
-	"O4,Overscan,Hidden,Visible;",
-	"O3,Artifact,Enable,Disable;",
-	"O2,Artifact Phase,Normal,Reverse;",
+	"F1,CCCROM,Load Cartridge;",
+	"-;",
+	"OC,Tape Input,File,ADC;",
+	"H0F2,CAS,Load Cassette;",
+	"H0TF,Stop & Rewind;",
+	"OD,Monitor Tape Sound,No,Yes;",
+	"-;",
+	"P1,Video Settings;",
+	"P1-;",
+	"P1-, -= Video Settings =-;",
+	"P1-;",
+	"P1OJK,Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
+	"P1OFH,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;", 
+	"P1O4,Overscan,Hidden,Visible;",
+	"P1O3,Artifact,Enable,Disable;",
+	"P1O2,Artifact Phase,Normal,Reverse;",
 //	"O58,Count Offset,1,2,3,4;",
 	"-;",
 	"OA,Swap Joysticks,Off,On;",
 	"-;",
-	"OB,Debug display,Off,On;",
-	"-;",
-	"F1,CCCROM,Load Cartridge;",
-	"-;",
-	"OC,Tape Input,File,ADC;",
-	"D0F2,CAS,Load Cassette;",
-	"D0TF,Stop & Rewind;",
-	"-;",
+	"O89,Machine,CoCo2,Dragon32,Dragon64",
 	"O7,Turbo,Off,On",
 	"-;",
-	"O89,Machine,CoCo2,Dragon32,Dragon64",
+	"OB,Debug display,Off,On;",
 	"-;",
 	"R0,Reset;",
 	"J1,Button;",
@@ -341,7 +352,7 @@ wire [7:0] red;
 wire [7:0] green;
 wire [7:0] blue;
 
-wire [5:0] sound;
+wire [11:0] sound;
 
 
 wire [9:0] center_joystick_y1   =  8'd128 + joya1[15:8];
@@ -421,6 +432,7 @@ dragoncoco dragoncoco(
   .joya2(coco_ajoy2),
 
 
+  .cass_snd(adc_value),
   .sound(sound),
   .sndout(sndout),
 
