@@ -195,8 +195,8 @@ architecture SYN of mc6847pace is
       -- not quite black in alpha mode
       if an_g_v = '0' and an_s_v = '0' then
         -- dark green/orange
-        r := '0' & css_v & "000000";
-        g := "01000000";
+        r := "00" & css_v & "00000";
+        g := "00100000";
       else
         r := (others => '0');
         g := (others => '0');
