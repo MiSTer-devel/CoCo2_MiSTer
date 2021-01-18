@@ -206,6 +206,7 @@ localparam CONF_STR = {
 	"P1O2,Artifact Phase,Normal,Reverse;",
 //	"O58,Count Offset,1,2,3,4;",
 	"-;",
+	"OL,D-Pad Joystick emu,No,Yes;",
 	"OA,Swap Joysticks,Off,On;",
 	"-;",
 	"O89,Machine,CoCo2,Dragon32,Dragon64",
@@ -425,6 +426,9 @@ dragoncoco dragoncoco(
   .artifact_enable(~status[3]),
   .overscan(status[4]),
 //  .count_offset(status[8:5]),
+
+  .joy_use_dpad(status[21]),
+
   .joy1(coco_joy1),
   .joy2(coco_joy2),
 
@@ -466,6 +470,7 @@ sdram sdram
 	.we(ioctl_wr & load_tape),
 	.ready()
 );
+
 
 cassette cassette(
   .clk(clk_sys),
