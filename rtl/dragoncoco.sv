@@ -7,6 +7,7 @@ module dragoncoco(
   input reset, // todo: reset doesn't work!
   input dragon,
   input dragon64,
+  input kblayout,
 
   // video signals
   output [7:0] red,
@@ -630,7 +631,7 @@ keyboard kb(
 .ps2_key(ps2_key),
 .addr(kb_cols),
 .kb_rows(kb_rows),
-.kblayout(1'b1),
+.kblayout(kblayout),
 .Fn(),
 .modif(),
 .joystick_1_button(joy1[4]),
