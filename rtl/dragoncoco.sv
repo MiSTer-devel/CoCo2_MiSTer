@@ -7,6 +7,7 @@ module dragoncoco(
   input reset, // todo: reset doesn't work!
   input dragon,
   input dragon64,
+  input kblayout,
 
   // video signals
   output [7:0] red,
@@ -40,6 +41,7 @@ module dragoncoco(
   // analog for position
   input [15:0] joya1,
   input [15:0] joya2,
+  input joy_use_dpad,
 
   
   // roms, cartridges, etc
@@ -304,7 +306,6 @@ dragon_bas romA_D(
   .dout(romA_dout_dragon),
   .cs(~romA_cs )
  );
- 
 
  
  
@@ -353,9 +354,7 @@ dragon_alt_bas64 romA_D64_2(
  );
  
  
- 
- 
- 
+
 
 // there must be another solution
 reg cart_loaded;
@@ -381,10 +380,6 @@ dpram #(.addr_width_g(14), .data_width_g(8)) romC(
 
 
 wire [2:0] s_device_select;
-
-
-
-
 
 
 
@@ -553,8 +548,6 @@ pia6520 pia1(
 
 
 
-
-
 assign DLine1 = {
 
 5'b10000,						// space
@@ -638,7 +631,7 @@ keyboard kb(
 .ps2_key(ps2_key),
 .addr(kb_cols),
 .kb_rows(kb_rows),
-.kblayout(1'b1),
+.kblayout(kblayout),
 .Fn(),
 .modif(),
 .joystick_1_button(joy1[4]),
@@ -651,10 +644,54 @@ keyboard kb(
 // the DAC isn't really a DAC but represents the DAC chip on the schematic. 
 // All the signals have been digitized before it gets here.
 
+reg [15:0] dac_joya1;
+reg [15:0] dac_joya2;
+
+always @(clk) begin
+
+	if (joy_use_dpad)
+	  begin
+		dac_joya1[15:8] <= 8'd128;
+		dac_joya1[7:0]  <= 8'd128;
+		
+		dac_joya2[15:8] <= 8'd128;
+		dac_joya2[7:0]  <= 8'd128;
+		
+		if (joy1[0])	// right
+			dac_joya1[15:8] <= 8'd240;
+
+		if (joy1[1])	// left
+			dac_joya1[15:8] <= 8'd16;
+		
+		if (joy1[2])	// down
+			dac_joya1[7:0] <= 8'd240;
+
+		if (joy1[3])	// up
+			dac_joya1[7:0] <= 8'd16;
+		
+		if (joy2[0])	// right
+			dac_joya2[15:8] <= 8'd240;
+
+		if (joy2[1])	// left
+			dac_joya2[15:8] <= 8'd16;
+		
+		if (joy2[2])	// down
+			dac_joya2[7:0] <= 8'd240;
+
+		if (joy2[3])	// up
+			dac_joya2[7:0] <= 8'd16;
+	  end
+	else
+	  begin
+		dac_joya1 <= joya1;
+		dac_joya2 <= joya2;
+	  end
+end
+
 dac dac(
 .clk(clk),
-.joya1(joya1),
-.joya2(joya2),
+.joya1(dac_joya1),
+.joya2(dac_joya2),
 .dac(dac_data),
 .cass_snd(cass_snd),
 .snden(snden),

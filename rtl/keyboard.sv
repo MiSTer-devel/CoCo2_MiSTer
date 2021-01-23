@@ -339,6 +339,11 @@ always @(posedge clk_sys) begin
 						shiftstate <= press_btn;
 					end
 
+			8'h58 : begin
+						keys[4][0] <= ~press_btn; // Caps lock (= shift-0 on CoCo)
+						keys[6][7] <= ~press_btn;
+					end
+
 //			8'h14 : keys[7][1] <= press_btn; // CTRL (Symbol Shift)
 
 
