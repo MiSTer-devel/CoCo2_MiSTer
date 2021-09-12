@@ -4,7 +4,7 @@
 module dragoncoco(
   input clk, // 42.954 mhz
   input turbo,
-  input reset, // todo: reset doesn't work!
+  input reset_n, // todo: reset_n doesn't work!
   input dragon,
   input dragon64,
   input kblayout,
@@ -65,14 +65,37 @@ module dragoncoco(
   output [8:0] v_count,
   output [8:0] h_count,
   output [159:0] DLine1,
-  output [159:0] DLine2
+  output [159:0] DLine2,
+
+
+  // DISK
+  //
+input				CLK50MHZ,
+
+  // SD block level interface
+input   [3:0]  		img_mounted, // signaling that new image has been mounted
+input				img_readonly, // mounted as read only. valid only for active bit in img_mounted
+input 	[19:0] 		img_size,    // size of image in bytes. 1MB MAX!
+
+output	[31:0] 		sd_lba[4],
+output  [5:0] 		sd_blk_cnt[4], // number of blocks-1, total size ((sd_blk_cnt+1)*(1<<(BLKSZ+7))) must be <= 16384!
+
+output 	reg  [3:0]	sd_rd,
+output 	reg  [3:0]	sd_wr,
+input        [3:0]	sd_ack,
+
+// SD byte level access. Signals for 2-PORT altsyncram.
+input  	[8:0] 		sd_buff_addr,
+input  	[7:0] 		sd_buff_dout,
+output 	[7:0] 		sd_buff_din[4],
+input        		sd_buff_wr
 
 );
 
 assign clk_Q_out = clk_Q;
 
-wire nmi = 1'b1;
-wire halt = 1'b1;
+wire nmi; 
+wire halt; 
 
 wire clk_E, clk_Q;
 
@@ -83,7 +106,7 @@ reg [1:0] count;
 
 always @(posedge clk)
 begin
-	if (~reset)
+	if (~reset_n)
 		count<=0;
 	else
 	begin
@@ -105,7 +128,7 @@ reg [1:0] count2;
 
 always @(posedge clk)
 begin
-	if (~reset)
+	if (~reset_n)
 		count2<=0;
 	else
 	begin
@@ -239,12 +262,12 @@ mc6809i cpu(
   .BA(cpu_ba),
   .nIRQ(~irq),
   .nFIRQ(~firq),
-  .nNMI(nmi),
+  .nNMI(~nmi),
   .AVMA(cpu_adv_valid_addr),
   .BUSY(cpu_busy),
   .LIC(cpu_last_inst_cycle),
-  .nHALT(halt),
-  .nRESET(reset),
+  .nHALT(~halt),
+  .nRESET(reset_n),
   .nDMABREQ(1)
 );
 
@@ -393,7 +416,7 @@ reg q_r;
 
 always @(posedge clk)
 begin
-	if (~reset)
+	if (~reset_n)
 	begin
 		ras_n_r<=0;
 		cas_n_r<=0;
@@ -438,7 +461,7 @@ end
 mc6883 sam(
 			.clk(clk),
 			.clk_ena(clk_enable),
-			.reset(~reset),
+			.reset(~reset_n),
 
 			//-- input
 			.addr(cpu_addr),
@@ -512,7 +535,7 @@ pia6520 pia(
   .cb2_out(selb), // used for joy & snd
   .clk(clk),
   .clk_ena(clk_enable),
-  .reset(~reset)
+  .reset(~reset_n)
 );
 
 
@@ -537,13 +560,13 @@ pia6520 pia1(
   .portb_out(pia1_portb_out),
   .ca1_in(dragon64?1'b1:1'b0), // from dragon64 schematic - this should be held high
   .ca2_in(),
-  .cb1_in(cart_loaded & reset & clk_Q), // cartridge inserted
+  .cb1_in(cart_loaded & reset_n & clk_Q), // cartridge inserted
   .cb2_in(),
   .ca2_out(cas_relay),
   .cb2_out(snden),
   .clk(clk),
   .clk_ena(clk_enable),
-  .reset(~reset)
+  .reset(~reset_n)
 );
 
 
@@ -587,7 +610,7 @@ assign DLine2 = {
 mc6847pace vdg(
   .clk(clk),
   .clk_ena(clk_enable),//VClk - vclk doesn't seem to work
-  .reset(~reset),
+  .reset(~reset_n),
   .da0(da0),
   .dd(ram_dout_b),
   .hs_n(hs_n),
@@ -626,7 +649,7 @@ mc6847pace vdg(
 wire hilo;
 keyboard kb(
 .clk_sys(clk),
-.reset(~reset),
+.reset(~reset_n),
 .dragon(dragon),
 .ps2_key(ps2_key),
 .addr(kb_cols),
@@ -711,4 +734,36 @@ acia acia (
    .data(acia_dout)
   );
 
+
+fdc coco_fdc(
+	.CLK(CLK50MHZ),     				// clock
+	.RESET_N(reset_n),	   				// async reset_n
+	.HDD_EN(io_cs),
+	.RW_N(cpu_rw),
+	.ADDRESS(cpu_addr[3:0]),	       		// i/o port addr [extended for coco]
+	.DATA_IN(cpu_dout),        			// data in
+	.DATA_HDD(io_out),      			// data out
+	.HALT(halt),         				// DMA request
+	.NMI_09(nmi),
+
+// 	SD block level interface
+	.img_mounted(img_mounted), 			// signaling that new image has been mounted
+	.img_readonly(img_readonly), 		// mounted as read only. valid only for active bit in img_mounted
+	.img_size(img_size),    			// size of image in bytes. 1MB MAX!
+
+	.sd_lba(sd_lba),
+	.sd_blk_cnt(sd_blk_cnt), 			// number of blocks-1, total size ((sd_blk_cnt+1)*(1<<(BLKSZ+7))) must be <= 16384!
+	.sd_rd(sd_rd),
+	.sd_wr(sd_wr),
+	.sd_ack(sd_ack),
+
+// 	SD byte level access. Signals for 2-PORT altsyncram.
+	.sd_buff_addr(sd_buff_addr),
+	.sd_buff_dout(sd_buff_dout),
+	.sd_buff_din(sd_buff_din),
+	.sd_buff_wr(sd_buff_wr),
+	
+	.probe(fdc_probe)
+);
+wire	[7:0]	fdc_probe;
 endmodule
