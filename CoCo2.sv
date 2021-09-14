@@ -216,12 +216,13 @@ assign VIDEO_ARY = (!ar) ? 12'd3 : 12'd0;
 localparam CONF_STR = {
 	"CoCo2;;",
 	"-;",
-	"F1,CCCROM,Load Cartridge;",
+	"OE,Cart Slot,Cartridge,Disk;",
 	"-;",
-	"S0,DSK,Load Disk Drive 0;",
-   "S1,DSK,Load Disk Drive 1;",
-   "S2,DSK,Load Disk Drive 2;",
-   "S3,DSK,Load Disk Drive 3;",
+	"H1F1,CCCROM,Load Cartridge;",
+	"H2S0,DSK,Load Disk Drive 0;",
+   "H2S1,DSK,Load Disk Drive 1;",
+   "H2S2,DSK,Load Disk Drive 2;",
+   "H2S3,DSK,Load Disk Drive 3;",
 	"-;",
 	"OC,Tape Input,File,ADC;",
 	"H0F2,CAS,Load Cassette;",
@@ -249,7 +250,7 @@ localparam CONF_STR = {
 	"OB,Debug display,Off,On;",
 	"-;",
 	"R0,Reset;",
-	"J1,Button;",
+	"J,Button;",
 	"jn,A;",
 	"V,v",`BUILD_DATE
 };
@@ -265,22 +266,22 @@ wire  [7:0] ioctl_data;
 wire  [7:0] ioctl_index;
 
 // SD block level interface
-wire	[3:0]  		img_mounted;
+wire	[3:0]  	img_mounted;
 wire				img_readonly;
-wire	[19:0] 		img_size;
+wire	[19:0] 	img_size;
 
-wire	[31:0] 		sd_lba[4];
-wire	[5:0] 		sd_blk_cnt[4];
+wire	[31:0] 	sd_lba[4];
+wire	[5:0] 	sd_blk_cnt[4];
 
 wire	[3:0]		sd_rd;
 wire	[3:0]		sd_wr;
 wire	[3:0]		sd_ack;
 
 // SD byte level access. Signals for 2-PORT altsyncram.
-wire  	[8:0] 		sd_buff_addr;
-wire  	[7:0] 		sd_buff_dout;
-wire 	[7:0] 		sd_buff_din[4];
-wire        		sd_buff_wr;
+wire  [8:0] 	sd_buff_addr;
+wire  [7:0] 	sd_buff_dout;
+wire 	[7:0] 	sd_buff_din[4];
+wire        	sd_buff_wr;
 
 
 wire [31:0] joy1, joy2;
@@ -288,6 +289,7 @@ wire [31:0] joy1, joy2;
 wire [15:0] joya1, joya2;
 wire [21:0] gamma_bus;
 
+wire disk_cart_enabled = status[14] & status[9:8]==2'b00;
 
 hps_io #(.CONF_STR(CONF_STR),.VDNUM(4),.BLKSZ(2)) hps_io
 (
@@ -300,7 +302,7 @@ hps_io #(.CONF_STR(CONF_STR),.VDNUM(4),.BLKSZ(2)) hps_io
 
 	.buttons(buttons),
 	.status(status),
-	.status_menumask({status[12]}),
+	.status_menumask({~disk_cart_enabled,disk_cart_enabled,status[12]}),
 
 	.ioctl_download(ioctl_download),
 	.ioctl_wr(ioctl_wr),
@@ -520,6 +522,9 @@ dragoncoco dragoncoco(
 
   .clk_Q_out(clk_Q_out),
 
+  // we load the disk ROM instead of cart ram
+  .disk_cart_enabled(disk_cart_enabled),
+  
   .img_mounted(img_mounted), 	// signaling that new image has been mounted
   .img_readonly(img_readonly), 	// mounted as read only. valid only for active bit in img_mounted
   .img_size(img_size),			// size of image in bytes. 1MB MAX!

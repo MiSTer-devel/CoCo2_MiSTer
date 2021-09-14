@@ -70,6 +70,7 @@ module dragoncoco(
 
   // DISK
   //
+  input disk_cart_enabled,
   input				CLK50MHZ,
 
   // SD block level interface
@@ -171,6 +172,8 @@ reg [7:0] rom8_dout2;
 wire [7:0] romA_dout;
 reg [7:0] romA_dout2;
 wire [7:0] romC_dout;
+wire [7:0] romC_cart_dout;
+wire [7:0] romC_disk_dout;
 reg [7:0] romC_dout2;
 wire [7:0] pia_dout;
 reg [7:0] pia_dout2;
@@ -384,14 +387,16 @@ reg cart_loaded;
 always @(posedge clk)
   if (load_cart & ioctl_download & ~ioctl_wr)
     cart_loaded <= ioctl_addr > 15'h100;
+	else if (disk_cart_enabled)
+    cart_loaded <= 1'b1;
 
 wire load_cart = ioctl_index == 1;
 
 dpram #(.addr_width_g(14), .data_width_g(8)) romC(
   .clock_a(clk),
   .address_a(cpu_addr[13:0]),
-  .q_a(romC_dout),
-  .enable_a(romC_cs),
+  .q_a(romC_cart_dout),
+  .enable_a(romC_cart_dout),
 
   .clock_b(clk),
   .address_b(ioctl_addr[13:0]),
@@ -400,6 +405,14 @@ dpram #(.addr_width_g(14), .data_width_g(8)) romC(
 );
 
 
+rom_dsk tandy_disk_rom(
+  .clk(clk),
+  .addr(cpu_addr[12:0]),
+  .dout(romC_disk_dout),
+  .cs(romC_cs )
+ );
+
+ assign romC_dout = disk_cart_enabled ? romC_disk_dout : romC_cart_dout;
 
 
 wire [2:0] s_device_select;
