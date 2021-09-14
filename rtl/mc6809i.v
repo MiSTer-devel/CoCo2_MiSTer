@@ -532,7 +532,7 @@ endgenerate
 
 ///////////////////////////////////////////////////////////////////////
 
-
+/*
 always @(negedge NMISample2 or posedge wNMIClear)
 begin
     if (wNMIClear == 1)
@@ -542,7 +542,16 @@ begin
     else
         NMILatched <= 1;
 end
-
+*/
+always @(negedge clk or posedge wNMIClear)
+begin
+	if (wNMIClear == 1)
+		NMILatched <= 1;
+	else if (E==0 && e_r ==1) begin
+	if ( ~NMISample & NMISample2) // falling edge of NMISample2
+		NMILatched <= NMIMask;
+	end
+end
 //
 // The 6809 specs say that the CPU control signals are sampled on the falling edge of Q.
 // It also says that the interrupts require 1 cycle of synchronization time.  

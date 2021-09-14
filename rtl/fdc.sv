@@ -87,14 +87,9 @@ wire			MOTOR;
 wire			WRT_PREC;
 wire			DENSITY;
 wire			HALT_EN;
-wire 			INTRQ;
-wire			DRQ;
 
-wire			WR;
-wire			RD;
-wire			CE;
-wire			HALT_EN_RST;
-wire	[7:0]	DATA_1793;
+// Diagnostics only
+assign probe = {sd_ack, WR[0], RD[0], NMI_09, HALT};
 
 // Generate a 1 Mhz enable for the fdc... and control writes
 wire ena_1Mhz;
@@ -114,9 +109,6 @@ begin
 		end
 end
 
-// Diagnostics only
-assign probe = {temp_sd_ack, WR, RD, prepare, NMI_09, HALT};
-
 //FDC read data path.  =$ff40 or wd1793
 assign	DATA_HDD =		({HDD_EN, ADDRESS[3:0]} == 5'h10)	?	{HALT_EN, 
 																DRIVE_SEL_EXT[3],
@@ -126,20 +118,6 @@ assign	DATA_HDD =		({HDD_EN, ADDRESS[3:0]} == 5'h10)	?	{HALT_EN,
 																DRIVE_SEL_EXT[2:0]}:
 						(CE == 1'b1)						?	DATA_1793:
 																8'h00;
-
-// Control signals for the wd1793
-assign WR = (~RW_N && CE);
-assign RD = (RW_N && CE);
-assign CE = (HDD_EN && ADDRESS[3]);
-
-
-//	NMI from disk controller
-assign	NMI_09	=	DENSITY && INTRQ;				// Send NMI if Double Density (Halt Mode)
-
-//	HALT from disk controller
-assign	HALT	=	HALT_EN && ~DRQ;
-
-assign	HALT_EN_RST = RESET_N && ~INTRQ; // From controller schematic
 
 // $ff40 control register [part 1]
 always @(negedge CLK or negedge RESET_N)
@@ -196,23 +174,66 @@ end
 // blk interfaces down to a single interface for the wd1793.
 
 wire	[2:0]	drive_index;
-wire 	[7:0]	temp_sd_buf_din;
-wire			temp_sd_rd;
-wire			temp_sd_wr;
-wire	[31:0]	temp_sd_lba;
-wire			temp_img_mounted;
-wire			temp_sd_ack;
-wire			prepare;
 
 assign 	drive_index = 	(DRIVE_SEL_EXT[3:0] == 4'b1000)	?	3'd3: 
 						(DRIVE_SEL_EXT[3:0] == 4'b0100)	?	3'd2:
 						(DRIVE_SEL_EXT[3:0] == 4'b0010)	?	3'd1:
-															3'd0;
-// The write input to the sd block interface all comes from the same interface on the wd1793.
-assign sd_buff_din[3] = temp_sd_buf_din;
-assign sd_buff_din[2] = temp_sd_buf_din;
-assign sd_buff_din[1] = temp_sd_buf_din;
-assign sd_buff_din[0] = temp_sd_buf_din;
+						(DRIVE_SEL_EXT[3:0] == 4'b0001)	?	3'd0:
+															3'd4;
+
+// Control signals for the wd1793
+
+wire 			INTRQ[4];
+wire			DRQ[4];
+wire			selected_DRQ;
+wire			selected_INTRQ;
+
+wire			WR[4];
+wire			RD[4];
+wire			CE;
+wire			HALT_EN_RST;
+wire	[7:0]	DATA_1793;
+wire	[7:0]	dout[4];
+
+assign CE = (HDD_EN && ADDRESS[3]);
+
+assign WR[0] = (~RW_N && CE) & (drive_index == 3'd0);
+assign WR[1] = (~RW_N && CE) & (drive_index == 3'd1);
+assign WR[2] = (~RW_N && CE) & (drive_index == 3'd2);
+assign WR[3] = (~RW_N && CE) & (drive_index == 3'd3);
+
+assign RD[0] = (RW_N && CE)  & (drive_index == 3'd0);
+assign RD[1] = (RW_N && CE)  & (drive_index == 3'd1);
+assign RD[2] = (RW_N && CE)  & (drive_index == 3'd2);
+assign RD[3] = (RW_N && CE)  & (drive_index == 3'd3);
+
+//	NMI from disk controller
+//	Selected INTRQ
+assign	selected_INTRQ	=	(drive_index == 3'd0)	?	INTRQ[0]:
+							(drive_index == 3'd1)	?	INTRQ[1]:
+							(drive_index == 3'd2)	?	INTRQ[2]:
+							(drive_index == 3'd3)	?	INTRQ[3]:
+														1'b0;
+
+assign	NMI_09	=	DENSITY & selected_INTRQ;				// Send NMI if Double Density (Halt Mode)
+
+//	HALT from disk controller
+
+assign	selected_DRQ	=	(drive_index == 3'd0)	?	DRQ[0]:
+							(drive_index == 3'd1)	?	DRQ[1]:
+							(drive_index == 3'd2)	?	DRQ[2]:
+							(drive_index == 3'd3)	?	DRQ[3]:
+														1'b1;
+
+assign	HALT	=	HALT_EN & ~selected_DRQ;
+
+assign	HALT_EN_RST = RESET_N & ~selected_INTRQ; // From controller schematic
+
+assign	DATA_1793 	=		(drive_index == 3'd0)	?	dout[0]:
+							(drive_index == 3'd1)	?	dout[1]:
+							(drive_index == 3'd2)	?	dout[2]:
+							(drive_index == 3'd3)	?	dout[3]:
+														8'd0;
 
 // The wd1793 will allways transfer 1 blk. This is blk qty - 1 per spec.
 assign sd_blk_cnt[3] = 6'd0;
@@ -220,242 +241,238 @@ assign sd_blk_cnt[2] = 6'd0;
 assign sd_blk_cnt[1] = 6'd0;
 assign sd_blk_cnt[0] = 6'd0;
 
-// Demux of the proper sd rd command bit on the bus of 4
-assign sd_rd = 			(drive_index == 3'd3)			?	{temp_sd_rd,3'b000}:
-						(drive_index == 3'd2)			?	{1'b0,temp_sd_rd,2'b00}:
-						(drive_index == 3'd1)			?	{2'b00,temp_sd_rd,1'b0}:
-															{3'b000,temp_sd_rd};
+reg				drive_wp[4];
+reg				drive_ready[4];
 
-// Demux of the proper sd wr command bit on the bus of 4
-assign sd_wr = 			(drive_index == 3'd3)			?	{temp_sd_wr,3'b000}:
-						(drive_index == 3'd2)			?	{1'b0,temp_sd_wr,2'b00}:
-						(drive_index == 3'd1)			?	{2'b00,temp_sd_wr,1'b0}:
-															{3'b000,temp_sd_wr};
-
-// This places the lba address generated from the wd1793 on the proper sd_lba bus of the active drive.
-assign sd_lba[3]=		(drive_index == 3'd3)			?	temp_sd_lba:
-															32'd0;
-
-assign sd_lba[2]=		(drive_index == 3'd2)			?	temp_sd_lba:
-															32'd0;
-
-assign sd_lba[1]=		(drive_index == 3'd1)			?	temp_sd_lba:
-															32'd0;
-
-assign sd_lba[0]=		(drive_index == 3'd0)			?	temp_sd_lba:
-															32'd0;
-
-// Demux of the proper sd ack command bit on the bus of 4
-assign temp_sd_ack =		(drive_index == 3'd3)		?	sd_ack[3]:
-							(drive_index == 3'd2)		?	sd_ack[2]:
-							(drive_index == 3'd1)		?	sd_ack[1]:
-															sd_ack[0];
-
-wire			drive_ready[4];
-wire	[19:0]	drive_size[4];
-wire			drive_wp[4];
-
-wire			active_drive_ready;
-wire			active_drive_size;
-wire			active_drive_wp;
-
-
-// As drives are mounted in MISTer this logic saves the ready, size, and write protect for
+// As drives are mounted in MISTer this logic saves the write protect for
 // changing drives to the wd1793.
 
 // Drive 0
 
-always @(negedge img_mounted[0] or negedge RESET_N)
+//always @(negedge img_mounted[0] or negedge RESET_N)
+always @(posedge CLK)
 begin
 	if (~RESET_N)
+	begin
+		drive_wp[0] <= 1'b1;
 		drive_ready[0] <= 1'b0;
-	else
+	end
+	else if (~img_mounted[0])
 		begin
-			drive_ready[0] <= 1'b1;
-			drive_size[0] <= img_size;
 			drive_wp[0] <= img_readonly;
+			drive_ready[0] <= 1'b1;
 		end
 end
 
 // Drive 1
 
-always @(negedge img_mounted[1] or negedge RESET_N)
+//always @(negedge img_mounted[1] or negedge RESET_N)
+always @(posedge CLK)
 begin
 	if (~RESET_N)
+	begin
+		drive_wp[1] <= 1'b1;
 		drive_ready[1] <= 1'b0;
-	else
+	end
+	else if (~img_mounted[1])
 		begin
-			drive_ready[1] <= 1'b1;
-			drive_size[1] <= img_size;
 			drive_wp[1] <= img_readonly;
+			drive_ready[1] <= 1'b1;
 		end
 end
 
 // Drive 2
 
-always @(negedge img_mounted[2] or negedge RESET_N)
+//always @(negedge img_mounted[2] or negedge RESET_N)
+always @(posedge CLK)
 begin
 	if (~RESET_N)
+	begin
+		drive_wp[2] <= 1'b1;
 		drive_ready[2] <= 1'b0;
-	else
+	end
+	else if (~img_mounted[2])
 		begin
-			drive_ready[2] <= 1'b1;
-			drive_size[2] <= img_size;
 			drive_wp[2] <= img_readonly;
+			drive_ready[2] <= 1'b1;
 		end
 end
 
 // Drive 3
 
-always @(negedge img_mounted[3] or negedge RESET_N)
+//always @(negedge img_mounted[3] or negedge RESET_N)
+always @(posedge CLK)
 begin
 	if (~RESET_N)
+	begin
+		drive_wp[3] <= 1'b1;
 		drive_ready[3] <= 1'b0;
-	else
+	end
+	else if (~img_mounted[3])
 		begin
-			drive_ready[3] <= 1'b1;
-			drive_size[3] <= img_size;
 			drive_wp[3] <= img_readonly;
+			drive_ready[3] <= 1'b1;
 		end
 end
 
-// The following logic generates a pulse with the saved drive infomation above
-// when the computer changes drives.
 
 
-wire		[3:0]	drive_sel_ext_d;
-wire				drive_0_change;
-wire				drive_1_change;
-wire				drive_2_change;
-wire				drive_3_change;
-wire				pulse_start;
-wire		[7:0]	pulse_time;
-wire		[3:0]	changed_drive;
-
-// detect drive changes
-assign drive_0_change = DRIVE_SEL_EXT[0] && ~drive_sel_ext_d[0];
-assign drive_1_change = DRIVE_SEL_EXT[1] && ~drive_sel_ext_d[1];
-assign drive_2_change = DRIVE_SEL_EXT[2] && ~drive_sel_ext_d[2];
-assign drive_3_change = DRIVE_SEL_EXT[3] && ~drive_sel_ext_d[3];
-
-
-always @(negedge CLK or negedge RESET_N)
-begin
-	if (~RESET_N)
-	begin
-		active_drive_ready <= 1'b0;
-		active_drive_size <= 20'b0;
-		active_drive_wp <= 1'b0;
-		pulse_time <= 7'b0;
-		pulse_start <= 1'b0;
-		temp_img_mounted <= 1'b0;
-		changed_drive <= 4'd8;
-	end
-	else
-	begin
-//		Delay for drive detection
-		drive_sel_ext_d <= DRIVE_SEL_EXT;
-
-//		When a drive change detection occurs, log the drive and start a pulse generation which looks
-//		just like the img_mounted signal from the SD blk interface.  Additionally supply the wd1793 the
-//		saved drive data.
-
-		if (drive_0_change)
-		begin
-			changed_drive <= 4'd0;
-			pulse_start <= 1'b1;
-		end
-		if (drive_1_change)
-		begin
-			changed_drive <= 4'd1;
-			pulse_start <= 1'b1;
-		end
-		if (drive_2_change)
-		begin
-			changed_drive <= 4'd2;
-			pulse_start <= 1'b1;
-		end
-		if (drive_3_change)
-		begin
-			changed_drive <= 4'd3;
-			pulse_start <= 1'b1;
-		end
-
-		if (pulse_start)
-		begin
-//			Hold off on generating a img_mounted pulse if no drive has been mounted.
-			if (changed_drive < 4'd4)
-			begin
-				if (drive_ready[changed_drive])
-				begin
-
-					pulse_time <= pulse_time + 7'd1;
-
-					if (pulse_time == 7'd1)
-					begin
-						active_drive_ready <= drive_ready[changed_drive];
-						active_drive_size <= drive_size[changed_drive];
-						active_drive_wp <= drive_wp[changed_drive];
-						temp_img_mounted <= 1'b0;
-					end
-
-					if (pulse_time == 7'd2)
-					begin
-						temp_img_mounted <= 1'b1;
-					end
-
-					if (pulse_time == 7'd120)
-					begin
-						temp_img_mounted <= 1'b0;
-						pulse_start <= 1'b0;
-						pulse_time <= 7'b0;
-						changed_drive <= 4'd8;
-					end
-				end
-				else
-					active_drive_ready <= 1'b0;
-			end
-		end
-	end
-end
-
-wd1793 #(1) coco_wd1793
+wd1793 #(1,0) coco_wd1793_0
 (
-	.clk_sys(~CLK),
+	.clk_sys(CLK),
 	.ce(ena_1Mhz),
 	.reset(~RESET_N),
 	.io_en(1'b1),
-	.rd(RD),
-	.wr(WR),
+	.rd(RD[0]),
+	.wr(WR[0]),
 	.addr(ADDRESS[1:0]),
 	.din(DATA_IN),
-	.dout(DATA_1793),
-	.drq(DRQ),
-	.intrq(INTRQ),
+	.dout(dout[0]),
+	.drq(DRQ[0]),
+	.intrq(INTRQ[0]),
 
 	.img_mounted(img_mounted[0]),
 	.img_size(img_size),
-//	.img_mounted(temp_img_mounted),
-//	.img_size(active_drive_size),
-	.prepare(prepare),
 
-	.sd_lba(temp_sd_lba),
-	.sd_rd(temp_sd_rd),
-	.sd_wr(temp_sd_wr), 
-	.sd_ack(temp_sd_ack),
+	.sd_lba(sd_lba[0]),
+	.sd_rd(sd_rd[0]),
+	.sd_wr(sd_wr[0]), 
+	.sd_ack(sd_ack[0]),
 
 	.sd_buff_addr(sd_buff_addr),
 	.sd_buff_dout(sd_buff_dout),
-	.sd_buff_din(temp_sd_buf_din), 
+	.sd_buff_din(sd_buff_din[0]), 
 	.sd_buff_wr(sd_buff_wr),
 
-	.wp(active_drive_wp),
+	.wp(drive_wp[0]),
 
 	.size_code(3'd5),		// 5 is 18 sector x 256 bits COCO standard
 	.layout(1'b1),			// 0 = Track-Side-Sector, 1 - Side-Track-Sector
 	.side(1'b0),			// Not support DS yet.
-//	.ready(active_drive_ready),
-	.ready(1'b1),
+	.ready(drive_ready[0]),
+
+	.input_active(0),
+	.input_addr(0),
+	.input_data(0),
+	.input_wr(0),
+	.buff_din(0)
+);
+
+wd1793 #(1,0) coco_wd1793_1
+(
+	.clk_sys(CLK),
+	.ce(ena_1Mhz),
+	.reset(~RESET_N),
+	.io_en(1'b1),
+	.rd(RD[1]),
+	.wr(WR[1]),
+	.addr(ADDRESS[1:0]),
+	.din(DATA_IN),
+	.dout(dout[1]),
+	.drq(DRQ[1]),
+	.intrq(INTRQ[1]),
+
+	.img_mounted(img_mounted[1]),
+	.img_size(img_size),
+
+	.sd_lba(sd_lba[1]),
+	.sd_rd(sd_rd[1]),
+	.sd_wr(sd_wr[1]), 
+	.sd_ack(sd_ack[1]),
+
+	.sd_buff_addr(sd_buff_addr),
+	.sd_buff_dout(sd_buff_dout),
+	.sd_buff_din(sd_buff_din[1]), 
+	.sd_buff_wr(sd_buff_wr),
+
+	.wp(drive_wp[1]),
+
+	.size_code(3'd5),		// 5 is 18 sector x 256 bits COCO standard
+	.layout(1'b1),			// 0 = Track-Side-Sector, 1 - Side-Track-Sector
+	.side(1'b0),			// Not support DS yet.
+	.ready(drive_ready[1]),
+
+	.input_active(0),
+	.input_addr(0),
+	.input_data(0),
+	.input_wr(0),
+	.buff_din(0)
+);
+
+wd1793 #(1,0) coco_wd1793_2
+(
+	.clk_sys(CLK),
+	.ce(ena_1Mhz),
+	.reset(~RESET_N),
+	.io_en(1'b1),
+	.rd(RD[2]),
+	.wr(WR[2]),
+	.addr(ADDRESS[1:0]),
+	.din(DATA_IN),
+	.dout(dout[2]),
+	.drq(DRQ[2]),
+	.intrq(INTRQ[2]),
+
+	.img_mounted(img_mounted[2]),
+	.img_size(img_size),
+
+	.sd_lba(sd_lba[2]),
+	.sd_rd(sd_rd[2]),
+	.sd_wr(sd_wr[2]), 
+	.sd_ack(sd_ack[2]),
+
+	.sd_buff_addr(sd_buff_addr),
+	.sd_buff_dout(sd_buff_dout),
+	.sd_buff_din(sd_buff_din[2]), 
+	.sd_buff_wr(sd_buff_wr),
+
+	.wp(drive_wp[2]),
+
+	.size_code(3'd5),		// 5 is 18 sector x 256 bits COCO standard
+	.layout(1'b1),			// 0 = Track-Side-Sector, 1 - Side-Track-Sector
+	.side(1'b0),			// Not support DS yet.
+	.ready(drive_ready[2]),
+
+	.input_active(0),
+	.input_addr(0),
+	.input_data(0),
+	.input_wr(0),
+	.buff_din(0)
+);
+
+wd1793 #(1,0) coco_wd1793_3
+(
+	.clk_sys(CLK),
+	.ce(ena_1Mhz),
+	.reset(~RESET_N),
+	.io_en(1'b1),
+	.rd(RD[3]),
+	.wr(WR[3]),
+	.addr(ADDRESS[1:0]),
+	.din(DATA_IN),
+	.dout(dout[3]),
+	.drq(DRQ[3]),
+	.intrq(INTRQ[3]),
+
+	.img_mounted(img_mounted[3]),
+	.img_size(img_size),
+
+	.sd_lba(sd_lba[3]),
+	.sd_rd(sd_rd[3]),
+	.sd_wr(sd_wr[3]), 
+	.sd_ack(sd_ack[3]),
+
+	.sd_buff_addr(sd_buff_addr),
+	.sd_buff_dout(sd_buff_dout),
+	.sd_buff_din(sd_buff_din[3]), 
+	.sd_buff_wr(sd_buff_wr),
+
+	.wp(drive_wp[3]),
+
+	.size_code(3'd5),		// 5 is 18 sector x 256 bits COCO standard
+	.layout(1'b1),			// 0 = Track-Side-Sector, 1 - Side-Track-Sector
+	.side(1'b0),			// Not support DS yet.
+	.ready(drive_ready[3]),
 
 	.input_active(0),
 	.input_addr(0),

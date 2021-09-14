@@ -217,8 +217,11 @@ localparam CONF_STR = {
 	"CoCo2;;",
 	"-;",
 	"F1,CCCROM,Load Cartridge;",
-			  "S0,DSK,Load Disk Drive 0;",
-
+	"-;",
+	"S0,DSK,Load Disk Drive 0;",
+   "S1,DSK,Load Disk Drive 1;",
+   "S2,DSK,Load Disk Drive 2;",
+   "S3,DSK,Load Disk Drive 3;",
 	"-;",
 	"OC,Tape Input,File,ADC;",
 	"H0F2,CAS,Load Cassette;",
@@ -528,7 +531,7 @@ dragoncoco dragoncoco(
   .sd_wr(sd_wr),
   .sd_ack(sd_ack),
 
-// 	SD byte level access. Signals for 2-PORT altsyncram.
+  // 	SD byte level access. Signals for 2-PORT altsyncram.
   .sd_buff_addr(sd_buff_addr),
   .sd_buff_dout(sd_buff_dout),
   .sd_buff_din(sd_buff_din),

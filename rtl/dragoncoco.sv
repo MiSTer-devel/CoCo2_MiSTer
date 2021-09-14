@@ -70,25 +70,25 @@ module dragoncoco(
 
   // DISK
   //
-input				CLK50MHZ,
+  input				CLK50MHZ,
 
   // SD block level interface
-input   [3:0]  		img_mounted, // signaling that new image has been mounted
-input				img_readonly, // mounted as read only. valid only for active bit in img_mounted
-input 	[19:0] 		img_size,    // size of image in bytes. 1MB MAX!
+  input   [3:0]  		img_mounted, // signaling that new image has been mounted
+  input				img_readonly, // mounted as read only. valid only for active bit in img_mounted
+  input 	[19:0] 		img_size,    // size of image in bytes. 1MB MAX!
 
-output	[31:0] 		sd_lba[4],
-output  [5:0] 		sd_blk_cnt[4], // number of blocks-1, total size ((sd_blk_cnt+1)*(1<<(BLKSZ+7))) must be <= 16384!
+  output	[31:0] 		sd_lba[4],
+  output  [5:0] 		sd_blk_cnt[4], // number of blocks-1, total size ((sd_blk_cnt+1)*(1<<(BLKSZ+7))) must be <= 16384!
 
-output 	reg  [3:0]	sd_rd,
-output 	reg  [3:0]	sd_wr,
-input        [3:0]	sd_ack,
+  output 	reg  [3:0]	sd_rd,
+  output 	reg  [3:0]	sd_wr,
+  input        [3:0]	sd_ack,
 
-// SD byte level access. Signals for 2-PORT altsyncram.
-input  	[8:0] 		sd_buff_addr,
-input  	[7:0] 		sd_buff_dout,
-output 	[7:0] 		sd_buff_din[4],
-input        		sd_buff_wr
+  // SD byte level access. Signals for 2-PORT altsyncram.
+  input  	[8:0] 		sd_buff_addr,
+  input  	[7:0] 		sd_buff_dout,
+  output 	[7:0] 		sd_buff_din[4],
+  input        		sd_buff_wr
 
 );
 
@@ -737,17 +737,17 @@ acia acia (
 
 fdc coco_fdc(
 	.CLK(CLK50MHZ),     				// clock
-	.RESET_N(reset_n),	   				// async reset_n
+	.RESET_N(reset_n),	   		// async reset_n
 	.HDD_EN(io_cs),
 	.RW_N(cpu_rw),
-	.ADDRESS(cpu_addr[3:0]),	       		// i/o port addr [extended for coco]
-	.DATA_IN(cpu_dout),        			// data in
-	.DATA_HDD(io_out),      			// data out
-	.HALT(halt),         				// DMA request
+	.ADDRESS(cpu_addr[3:0]),	   // i/o port addr [extended for coco]
+	.DATA_IN(cpu_dout),        	// data in
+	.DATA_HDD(io_out),      		// data out
+	.HALT(halt),         			// DMA request
 	.NMI_09(nmi),
 
-// 	SD block level interface
-	.img_mounted(img_mounted), 			// signaling that new image has been mounted
+	// 	SD block level interface
+	.img_mounted(img_mounted), 		// signaling that new image has been mounted
 	.img_readonly(img_readonly), 		// mounted as read only. valid only for active bit in img_mounted
 	.img_size(img_size),    			// size of image in bytes. 1MB MAX!
 
@@ -757,7 +757,7 @@ fdc coco_fdc(
 	.sd_wr(sd_wr),
 	.sd_ack(sd_ack),
 
-// 	SD byte level access. Signals for 2-PORT altsyncram.
+	// 	SD byte level access. Signals for 2-PORT altsyncram.
 	.sd_buff_addr(sd_buff_addr),
 	.sd_buff_dout(sd_buff_dout),
 	.sd_buff_din(sd_buff_din),
