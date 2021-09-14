@@ -396,7 +396,7 @@ dpram #(.addr_width_g(14), .data_width_g(8)) romC(
   .clock_a(clk),
   .address_a(cpu_addr[13:0]),
   .q_a(romC_cart_dout),
-  .enable_a(romC_cart_dout),
+  .enable_a(romC_cs),
 
   .clock_b(clk),
   .address_b(ioctl_addr[13:0]),
