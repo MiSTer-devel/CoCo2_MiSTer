@@ -216,7 +216,7 @@ assign VIDEO_ARY = (!ar) ? 12'd3 : 12'd0;
 localparam CONF_STR = {
 	"CoCo2;;",
 	"-;",
-	"OE,Cart Slot,Cartridge,Disk;",
+	"H3OE,Cart Slot,Cartridge,Disk;",
 	"-;",
 	"H1F1,CCCROM,Load Cartridge;",
 	"H2S0,DSK,Load Disk Drive 0;",
@@ -289,7 +289,6 @@ wire [31:0] joy1, joy2;
 wire [15:0] joya1, joya2;
 wire [21:0] gamma_bus;
 
-wire disk_cart_enabled = status[14] & status[9:8]==2'b00;
 
 hps_io #(.CONF_STR(CONF_STR),.VDNUM(4),.BLKSZ(2)) hps_io
 (
@@ -302,7 +301,7 @@ hps_io #(.CONF_STR(CONF_STR),.VDNUM(4),.BLKSZ(2)) hps_io
 
 	.buttons(buttons),
 	.status(status),
-	.status_menumask({~disk_cart_enabled,disk_cart_enabled,status[12]}),
+	.status_menumask({dragon,~disk_cart_enabled,disk_cart_enabled,status[12]}),
 
 	.ioctl_download(ioctl_download),
 	.ioctl_wr(ioctl_wr),
@@ -451,12 +450,17 @@ reg [1:0]machineselect_r;
 reg machine_select_reset;
 reg [3:0]reset_count;
 
+reg disk_cart_enabled;
+//wire disk_cart_enabled = status[14] & status[9:8]==2'b00;
+
+
 always @(posedge clk_sys)
 begin
  machine_select_reset <=1'b0;
  dragon64 <= (status[9:8]==2'b10);
  dragon   <= (status[9:8]!=2'b00);
- 
+ disk_cart_enabled <= (status[14] & status[9:8]==2'b00);
+
  if (machineselect_r!=status[9:8])
 	reset_count<=4'b1111;
 

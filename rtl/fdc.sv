@@ -248,16 +248,18 @@ reg				drive_ready[4];
 // changing drives to the wd1793.
 
 // Drive 0
+reg img_mounted_r[4];
 
 //always @(negedge img_mounted[0] or negedge RESET_N)
 always @(posedge CLK)
 begin
+   img_mounted_r[0]<=img_mounted[0];
 	if (~RESET_N)
 	begin
 		drive_wp[0] <= 1'b1;
 		drive_ready[0] <= 1'b0;
 	end
-	else if (~img_mounted[0])
+	else if (img_mounted_r[0]==1'b0 && img_mounted[0]==1'b1)
 		begin
 			drive_wp[0] <= img_readonly;
 			drive_ready[0] <= 1'b1;
@@ -269,12 +271,13 @@ end
 //always @(negedge img_mounted[1] or negedge RESET_N)
 always @(posedge CLK)
 begin
+   img_mounted_r[1]<=img_mounted[1];
 	if (~RESET_N)
 	begin
 		drive_wp[1] <= 1'b1;
 		drive_ready[1] <= 1'b0;
 	end
-	else if (~img_mounted[1])
+	else if (img_mounted_r[1]==1'b0 && img_mounted[1]==1'b1)
 		begin
 			drive_wp[1] <= img_readonly;
 			drive_ready[1] <= 1'b1;
@@ -286,12 +289,13 @@ end
 //always @(negedge img_mounted[2] or negedge RESET_N)
 always @(posedge CLK)
 begin
+   img_mounted_r[2]<=img_mounted[2];
 	if (~RESET_N)
 	begin
 		drive_wp[2] <= 1'b1;
 		drive_ready[2] <= 1'b0;
 	end
-	else if (~img_mounted[2])
+	else if (img_mounted_r[2]==1'b0 && img_mounted[2]==1'b1)
 		begin
 			drive_wp[2] <= img_readonly;
 			drive_ready[2] <= 1'b1;
@@ -303,12 +307,13 @@ end
 //always @(negedge img_mounted[3] or negedge RESET_N)
 always @(posedge CLK)
 begin
+   img_mounted_r[3]<=img_mounted[3];
 	if (~RESET_N)
 	begin
 		drive_wp[3] <= 1'b1;
 		drive_ready[3] <= 1'b0;
 	end
-	else if (~img_mounted[3])
+	else if (img_mounted_r[3]==1'b0 && img_mounted[3]==1'b1)
 		begin
 			drive_wp[3] <= img_readonly;
 			drive_ready[3] <= 1'b1;
