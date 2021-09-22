@@ -5,6 +5,7 @@ module dragoncoco(
   input clk, // 42.954 mhz
   input turbo,
   input reset_n, // todo: reset_n doesn't work!
+  input hard_reset,
   input dragon,
   input dragon64,
   input kblayout,
@@ -290,7 +291,9 @@ dpram #(.addr_width_g(16), .data_width_g(8)) ram1(
   //.address_b(vmem),
   //.q_b(ram_dout_b)
   .clock_b(clk),
-  .address_b(sam_a),
+  .address_b(hard_reset ? 16'h71: sam_a),
+  .data_b( 8'h00),
+  .wren_b( hard_reset ? 1'b1:1'b0),
   .q_b(vdg_data)
 );
 
@@ -748,35 +751,65 @@ acia acia (
   );
 
 
+//
+//  Floppy Controller Support
+//
+//  This isn't tested for dragon yet
+
+wire    ff40_write;
+wire    FF40_read;
+wire    wd1793_data_read;
+wire    wd1793_read;
+wire    wd1793_write;
+
+assign     ff40_write = (clk_E && io_cs && ({cpu_rw, cpu_addr[3:0]} == 5'b00000));
+
+assign    FF40_read =            ({io_cs, cpu_addr[3:0]} == 5'h10);
+assign    wd1793_data_read =    (io_cs && cpu_addr[3]);
+
+assign    wd1793_read =        (cpu_rw && io_cs && cpu_addr[3] & (clk_E || clk_Q));
+assign    wd1793_write =        (~cpu_rw && io_cs && cpu_addr[3] && clk_E);
+
 fdc coco_fdc(
-	.CLK(CLK50MHZ),     				// clock
-	.RESET_N(reset_n),	   		// async reset_n
-	.HDD_EN(io_cs),
-	.RW_N(cpu_rw),
-	.ADDRESS(cpu_addr[3:0]),	   // i/o port addr [extended for coco]
-	.DATA_IN(cpu_dout),        	// data in
-	.DATA_HDD(io_out),      		// data out
-	.HALT(halt),         			// DMA request
-	.NMI_09(nmi),
+    .CLK(CLK50MHZ),                     // clock
+    .RESET_N(reset_n),                       // async reset
+    .ADDRESS(cpu_addr[1:0]),               // i/o port addr for wd1793 & FF48+
+    .DATA_IN(cpu_dout),                    // data in
+    .DATA_HDD(io_out),                  // data out
+    .HALT(halt),                         // DMA request
+    .NMI_09(nmi),
+    .DS_ENABLE(1'b0),                    // DS support - '1 to enable drives 0-2
 
-	// 	SD block level interface
-	.img_mounted(img_mounted), 		// signaling that new image has been mounted
-	.img_readonly(img_readonly), 		// mounted as read only. valid only for active bit in img_mounted
-	.img_size(img_size),    			// size of image in bytes. 1MB MAX!
+//    FDC host r/w handling
+    .FF40_CLK(ff40_write),
+    .FF40_ENA(1'b1),                    // Disabled in coco2
 
-	.sd_lba(sd_lba),
-	.sd_blk_cnt(sd_blk_cnt), 			// number of blocks-1, total size ((sd_blk_cnt+1)*(1<<(BLKSZ+7))) must be <= 16384!
-	.sd_rd(sd_rd),
-	.sd_wr(sd_wr),
-	.sd_ack(sd_ack),
+    .FF40_RD(FF40_read),
+    .WD1793_RD(wd1793_data_read),
 
-	// 	SD byte level access. Signals for 2-PORT altsyncram.
-	.sd_buff_addr(sd_buff_addr),
-	.sd_buff_dout(sd_buff_dout),
-	.sd_buff_din(sd_buff_din),
-	.sd_buff_wr(sd_buff_wr),
-	
-	.probe(fdc_probe)
+    .WD1793_WR_CTRL(wd1793_write),
+    .WD1793_RD_CTRL(wd1793_read),
+
+
+    //     SD block level interface
+    .img_mounted(img_mounted),         // signaling that new image has been mounted
+    .img_readonly(img_readonly),         // mounted as read only. valid only for active bit in img_mounted
+    .img_size(img_size),                // size of image in bytes. 1MB MAX!
+
+    .sd_lba(sd_lba),
+    .sd_blk_cnt(sd_blk_cnt),             // number of blocks-1, total size ((sd_blk_cnt+1)*(1<<(BLKSZ+7))) must be <= 16384!
+    .sd_rd(sd_rd),
+    .sd_wr(sd_wr),
+    .sd_ack(sd_ack),
+
+    //     SD byte level access. Signals for 2-PORT altsyncram.
+    .sd_buff_addr(sd_buff_addr),
+    .sd_buff_dout(sd_buff_dout),
+    .sd_buff_din(sd_buff_din),
+    .sd_buff_wr(sd_buff_wr),
+
+    .probe(fdc_probe)
 );
+
 wire	[7:0]	fdc_probe;
 endmodule

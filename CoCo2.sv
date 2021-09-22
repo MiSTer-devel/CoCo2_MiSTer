@@ -220,9 +220,9 @@ localparam CONF_STR = {
 	"-;",
 	"H1F1,CCCROM,Load Cartridge;",
 	"H2S0,DSK,Load Disk Drive 0;",
-   "H2S1,DSK,Load Disk Drive 1;",
-   "H2S2,DSK,Load Disk Drive 2;",
-   "H2S3,DSK,Load Disk Drive 3;",
+	"H2S1,DSK,Load Disk Drive 1;",
+	"H2S2,DSK,Load Disk Drive 2;",
+	"H2S3,DSK,Load Disk Drive 3;",
 	"-;",
 	"OC,Tape Input,File,ADC;",
 	"H0F2,CAS,Load Cassette;",
@@ -249,6 +249,7 @@ localparam CONF_STR = {
 	"-;",
 	"OB,Debug display,Off,On;",
 	"-;",
+	"RN,Hard Reset;",
 	"R0,Reset;",
 	"J,Button;",
 	"jn,A;",
@@ -447,12 +448,13 @@ wire cas_relay;
 reg dragon64;
 reg dragon;
 reg [1:0]machineselect_r;
+reg hard_reset_r;
 reg machine_select_reset;
 reg [3:0]reset_count;
-
+reg [1:0] hard_reset_state = 2'b00;
 reg disk_cart_enabled;
 //wire disk_cart_enabled = status[14] & status[9:8]==2'b00;
-
+reg hard_reset;
 
 always @(posedge clk_sys)
 begin
@@ -461,8 +463,36 @@ begin
  dragon   <= (status[9:8]!=2'b00);
  disk_cart_enabled <= (status[14] & status[9:8]==2'b00);
 
- if (machineselect_r!=status[9:8])
+ if (hard_reset_r!=status[23])
+ begin
 	reset_count<=4'b1111;
+        hard_reset_state = 2'b01;
+ end
+
+ if (machineselect_r!=status[9:8])
+ begin
+	reset_count<=4'b1111;
+        //hard_reset_state = 2'b01; // for now don't force hard reset when
+	//switching systems
+ end
+ case (hard_reset_state)
+	2'b00: 
+	begin
+	end
+	2'b01:
+	begin
+		hard_reset = 1'b1;
+	        hard_reset_state=2'b10;
+	end
+	2'b10:
+	begin
+		hard_reset = 1'b0;
+	        hard_reset_state=2'b00;
+	end
+	2'b11:
+	begin
+	end
+ endcase
 
  if (reset_count>4'b0) begin
   reset_count<=reset_count - 4'b0001;
@@ -470,6 +500,7 @@ begin
  end
  
  machineselect_r<=status[9:8];
+ hard_reset_r<=status[23];
 end
 
 
@@ -477,6 +508,7 @@ dragoncoco dragoncoco(
   .clk(clk_sys), // 50 mhz
   .turbo(status[7]&cas_relay),
   .reset_n(~reset),
+  .hard_reset(hard_reset),
   .dragon(dragon),
   .dragon64(dragon64),
   .kblayout(~status[22]),
