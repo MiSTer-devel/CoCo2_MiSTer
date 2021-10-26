@@ -57,6 +57,8 @@ module pia6520
 	output reg [7:0] portb_out,
 	input      [7:0] portb_in,
 
+	output     [7:0] DDRB,
+	
 	input            ca1_in,
 	output reg       ca2_out,
 	input            ca2_in,
@@ -68,6 +70,8 @@ module pia6520
 	input            clk_ena,
 	input            reset
 );
+
+assign DDRB=ddrb;
 
 reg [7:0] ddra;
 reg [5:0] cra;

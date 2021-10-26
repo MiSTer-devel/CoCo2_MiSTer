@@ -231,11 +231,15 @@ assign pia_cs = dragon64 ? pia_64_cs : pia_orig_cs ;
 
 wire pia_64_cs= ~cpu_addr[2] & pia_orig_cs;
 wire acia_cs = cpu_addr[2] &  pia_orig_cs ;
-wire rom8_1_cs = rom8_cs & ~pia1_portb_out[2];
-wire rom8_2_cs = rom8_cs & pia1_portb_out[2];
-wire romA_1_cs = romA_cs & ~pia1_portb_out[2];
-wire romA_2_cs = romA_cs & pia1_portb_out[2];
 
+/* because of the tristate nature of the real hardware, and one pin having a resistor
+   pulling it high, we wired the output of DDRB2 to this logic, and it seems to swap 
+	ROM banks correctly now. A bit of a hack, but it seems to work.
+*/
+wire rom8_1_cs = rom8_cs & (~DDRB[2] | pia1_portb_out[2]);
+wire romA_1_cs = romA_cs & (~DDRB[2] | pia1_portb_out[2]);
+wire rom8_2_cs = rom8_cs & DDRB[2] & ~pia1_portb_out[2];
+wire romA_2_cs = romA_cs & DDRB[2] & ~pia1_portb_out[2];
 wire [7:0] cpu_din64;
 
 always_comb begin
@@ -562,7 +566,7 @@ wire sela,selb;
 wire snden;
 // 1 bit sound
 assign sndout = pia1_portb_out[1];
-
+wire [7:0] DDRB;
 pia6520 pia1(
   .data_out(pia1_dout),
   .data_in(cpu_dout),
@@ -574,6 +578,7 @@ pia6520 pia1(
   .porta_out({dac_data,casdin0,rsout1}),
   .portb_in(dragon64?8'b00000001:8'b00000000), // from dragon64 schematic 
   .portb_out(pia1_portb_out),
+  .DDRB(DDRB),
   .ca1_in(dragon64?1'b1:1'b0), // from dragon64 schematic - this should be held high
   .ca2_in(),
   .cb1_in(cart_loaded & reset_n & clk_Q), // cartridge inserted
