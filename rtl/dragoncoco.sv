@@ -175,6 +175,7 @@ reg [7:0] romA_dout2;
 wire [7:0] romC_dout;
 wire [7:0] romC_cart_dout;
 wire [7:0] romC_disk_dout;
+wire [7:0] romC_dragondisk_dout;
 reg [7:0] romC_dout2;
 wire [7:0] pia_dout;
 reg [7:0] pia_dout2;
@@ -202,7 +203,7 @@ wire [7:0] cpu_din =
   io_cs   ? io_out : 8'hff;
 */
 wire [7:0] cpu_din;
-reg [7:0] data_hold;
+
 always_comb begin
    unique case (1'b1)
      ram_cs:  cpu_din =  ram_dout;
@@ -217,6 +218,21 @@ always_comb begin
 	
 end
 
+/*
+always @(posedge clk)
+begin
+   unique case (1'b1)
+     ram_cs:  cpu_din =  ram_dout;
+     rom8_cs: cpu_din =  rom8_dout2;
+     romA_cs: cpu_din =  romA_dout2;
+     romC_cs: cpu_din =  romC_dout2;
+     pia_cs:  cpu_din =  pia_dout2;
+     pia1_cs: cpu_din =  pia1_dout2;
+     io_cs:   cpu_din =  io_out;
+     default: cpu_din =  8'hff;
+   endcase
+end
+*/
 
 /*
 Dragon 64 has two hardware changes to access more I/O
@@ -257,7 +273,7 @@ always_comb begin
      default:    cpu_din64 =  8'hff;
    endcase
 end
-
+/*
 mc6809i cpu(
   .clk(clk),
   .D(dragon64?cpu_din64:cpu_din),
@@ -274,10 +290,44 @@ mc6809i cpu(
   .AVMA(cpu_adv_valid_addr),
   .BUSY(cpu_busy),
   .LIC(cpu_last_inst_cycle),
-  .nHALT(~halt),
+  .nHALT(dragon ? 1'b1 : ~halt),
   .nRESET(reset_n),
   .nDMABREQ(1)
 );
+*/
+
+// CPU section copyrighted by John Kent
+reg clk_e_enable;
+reg e_r;
+always @(negedge clk)
+begin
+    e_r<=clk_E;
+    clk_e_enable<=0;
+    if (clk_E==0 && e_r ==1) 
+		clk_e_enable<=1;
+end
+cpu09 GLBCPU09(
+	//.clk(clk_E),
+	//.ce(1'b1),
+	.clk(clk),
+	.ce(clk_e_enable),
+	.rst(~reset_n),
+	.vma(cpu_adv_valid_addr),
+	.lic_out(cpu_last_inst_cycle),
+	.addr(cpu_addr),
+	.bs(cpu_bs),
+	.ba(cpu_ba),
+	.rw(cpu_rw),
+	.data_in(dragon64?cpu_din64:cpu_din),
+	.data_out(cpu_dout),
+	.halt( dragon ? 1'b0 : halt),
+	.hold(1'b0),
+	.irq(irq),
+	.firq(firq),
+	.nmi(nmi)
+);
+
+
 
 dpram #(.addr_width_g(16), .data_width_g(8)) ram1(
   .clock_a(clk),
@@ -411,6 +461,13 @@ dpram #(.addr_width_g(14), .data_width_g(8)) romC(
   .wren_b(ioctl_wr & load_cart)
 );
 
+/*dragon_dsk*/
+dratrs dragon_disk_rom(
+  .clk(clk),
+  .addr(cpu_addr[12:0]),
+  .dout(romC_dragondisk_dout),
+  .cs(romC_cs )
+ );
 
 rom_dsk tandy_disk_rom(
   .clk(clk),
@@ -419,7 +476,7 @@ rom_dsk tandy_disk_rom(
   .cs(romC_cs )
  );
 
- assign romC_dout = disk_cart_enabled ? romC_disk_dout : romC_cart_dout;
+ assign romC_dout = disk_cart_enabled ? (dragon ? romC_dragondisk_dout :romC_disk_dout ) : romC_cart_dout;
 
 
 wire [2:0] s_device_select;
@@ -510,6 +567,16 @@ mc6883 sam(
 			.dbg()//sam_dbg
 );
 
+/*
+reg [7:0] cs74138_reg;
+reg [2:0] s_device_select_reg;
+
+always @(posedge clk)
+begin
+	s_device_select_reg<=s_device_select;
+	cs74138_reg<=cs74138;
+end
+*/
 
 wire nc;
 wire [7:0] cs74138;
@@ -722,7 +789,7 @@ always @(clk) begin
 		if (joy2[2])	// down
 			dac_joya2[7:0] <= 8'd240;
 
-		if (joy2[3])	// up
+		if (joy2[3])	// upimg_mounted
 			dac_joya2[7:0] <= 8'd16;
 	  end
 	else

@@ -216,7 +216,7 @@ assign VIDEO_ARY = (!ar) ? 12'd3 : 12'd0;
 localparam CONF_STR = {
 	"CoCo2;;",
 	"-;",
-	"H3OE,Cart Slot,Cartridge,Disk;",
+	"OE,Cart Slot,Cartridge,Disk;",
 	"-;",
 	"H1F1,CCCROM,Load Cartridge;",
 	"H2S0,DSK,Load Disk Drive 0;",
@@ -461,7 +461,7 @@ begin
  machine_select_reset <=1'b0;
  dragon64 <= (status[9:8]==2'b10);
  dragon   <= (status[9:8]!=2'b00);
- disk_cart_enabled <= (status[14] & status[9:8]==2'b00);
+ disk_cart_enabled <= (status[14]);
 
  if (hard_reset_r!=status[23])
  begin
