@@ -266,7 +266,8 @@ always @(posedge clk_sys) begin
 	if(ce) begin
 		if(ready) begin
 			if(cnt) cnt <= cnt - 1;
-				else cnt <= 35000;
+//				else cnt <= 35000;
+				else cnt <= 31822;
 		end else cnt <= 0;
 		s_index <= (cnt < 100);
 	end
@@ -634,8 +635,10 @@ always @(posedge clk_sys) begin
 									// set real track to datareg
 									disk_track <= wdreg_data;
 									s_headloaded <= din[3];
+
+//									fixed seek
 									wdreg_track <= wdreg_data;
-									
+
 									// get busy
 									s_drq_busy <= 2'b01;
 									state <= STATE_WAIT;

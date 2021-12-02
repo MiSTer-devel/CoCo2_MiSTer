@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////////
 // Project Name:	COCO3 Targeting MISTer 
-// File Name:		fdc.vs
+// File Name:		fdc.sv
 //
 // Floppy Disk Controller for MISTer
 //
@@ -130,6 +130,15 @@ assign	DATA_HDD =		(FF40_RD)							?	{HALT_EN,
 
 // $ff40 control register [part 1]
 
+wire	[3:0]	DRIVE_SEL_EXT_PRE = {DATA_IN[6], DATA_IN[2:0]};
+reg		[2:0]	drive_index;
+
+// SD blk system is a array of 4 systems - one for each drive.  
+// To keep disk track memory, we created 4 wd1793's to match the sd block interfaces
+// For the interface back to the coco - we need to isolate the wd1793 the computer is talking
+// to and route those feedback signals back to the coco.  This is accomplished via the drive
+// select.  'drive_index' identifies which controller is addressd.
+
 
 always @(negedge FF40_CLK or negedge RESET_N)
 begin
@@ -139,6 +148,7 @@ begin
 		MOTOR <= 1'b0;
 		WRT_PREC <= 1'b0;
 		DENSITY <= 1'b0;
+		drive_index <= 3'd0;
 	end
 	else
 	begin
@@ -150,6 +160,28 @@ begin
 			MOTOR <= DATA_IN[3];				// Turn on motor, not used here just checked, 0=MotorOff 1=MotorOn
 			WRT_PREC <= DATA_IN[4];				// Write Precompensation, not used here
 			DENSITY <= DATA_IN[5];				// Density, not used here just checked
+			case(DRIVE_SEL_EXT_PRE)
+			4'b1000:
+				drive_index <= 3'd3;
+
+			4'b0100:
+				drive_index <= 3'd2;
+		
+			4'b0010:
+				drive_index <= 3'd1;
+			
+			4'b0001:
+				drive_index <= 3'd0;
+			
+			4'b1100:
+				drive_index <= 3'd2;
+			
+			4'b1010:
+				drive_index <= 3'd1;
+			
+			4'b1001:
+				drive_index <= 3'd0;
+			endcase
 		end
 	end
 end
@@ -170,23 +202,6 @@ begin
 	end
 end
 
-// SD blk system is a array of 4 systems - one for each drive.  
-// To keep disk track memory, we created 4 wd1793's to match the sd block interfaces
-// For the interface back to the coco - we need to isolate the wd1793 the computer is talking
-// to and route those feedback signals back to the coco.  This is accomplished via the drive
-// select.  'drive_index' identifies which controller is addressd.
-
-
-wire	[2:0]	drive_index;
-
-assign 	drive_index = 	(DRIVE_SEL_EXT[3:0] == 4'b1000)	?	3'd3: 
-						(DRIVE_SEL_EXT[3:0] == 4'b0100)	?	3'd2:
-						(DRIVE_SEL_EXT[3:0] == 4'b0010)	?	3'd1:
-						(DRIVE_SEL_EXT[3:0] == 4'b0001)	?	3'd0:
-						(DRIVE_SEL_EXT[3:0] == 4'b1100)	?	3'd2: // Side select and drive 2 = drive 2
-						(DRIVE_SEL_EXT[3:0] == 4'b1010)	?	3'd1: // Side select and drive 1 = drive 1
-						(DRIVE_SEL_EXT[3:0] == 4'b1001)	?	3'd0: // Side select and drive 0 = drive 0
-															3'd4;
 
 // Control signals for the wd1793
 
@@ -357,8 +372,9 @@ assign sd_blk_cnt[2] = 6'd0;
 assign sd_blk_cnt[1] = 6'd0;
 assign sd_blk_cnt[0] = 6'd0;
 
-reg				drive_wp[4];
-reg				drive_ready[4];
+reg       drive_wp[4];
+reg       [3:0] drive_ready  = 4'B0;
+reg       [3:0] double_sided = 4'B0;
 
 // As drives are mounted in MISTer this logic saves the write protect and generates ready for
 // changing drives to the wd1793.
@@ -371,12 +387,13 @@ begin
 	if (~RESET_N)
 	begin
 		drive_wp[0] <= 1'b1;
-		drive_ready[0] <= 1'b0;
 	end
 	else
 		begin
 			drive_wp[0] <= img_readonly;
 			drive_ready[0] <= 1'b1;
+			double_sided[0]<= img_size > 20'd368600;//20'd368640;
+
 		end
 end
 
@@ -387,12 +404,12 @@ begin
 	if (~RESET_N)
 	begin
 		drive_wp[1] <= 1'b1;
-		drive_ready[1] <= 1'b0;
 	end
 	else
 		begin
 			drive_wp[1] <= img_readonly;
 			drive_ready[1] <= 1'b1;
+			double_sided[1]<= img_size > 20'd368600;//20'd368640;
 		end
 end
 
@@ -403,12 +420,12 @@ begin
 	if (~RESET_N)
 	begin
 		drive_wp[2] <= 1'b1;
-		drive_ready[2] <= 1'b0;
 	end
 	else
 		begin
 			drive_wp[2] <= img_readonly;
 			drive_ready[2] <= 1'b1;
+			double_sided[2]<= img_size > 20'd368600;//20'd368640;
 		end
 end
 
@@ -419,18 +436,14 @@ begin
 	if (~RESET_N)
 	begin
 		drive_wp[3] <= 1'b1;
-		drive_ready[3] <= 1'b0;
 	end
 	else
 		begin
 			drive_wp[3] <= img_readonly;
 			drive_ready[3] <= 1'b1;
+			//double_sided[3]<= img_size > 20'd368600;//20'd368640;
 		end
 end
-
-wire	DS_ENA;
-
-assign	DS_ENA	=	(DS_ENABLE && DRIVE_SEL_EXT[3]);
 
 
 wd1793 #(1,1) coco_wd1793_0
@@ -463,8 +476,8 @@ wd1793 #(1,1) coco_wd1793_0
 	.wp(drive_wp[0]),
 
 	.size_code(3'd5),		// 5 is 18 sector x 256 bits COCO standard
-	.layout(1'b1),			// 0 = Track-Side-Sector, 1 - Side-Track-Sector
-	.side(DS_ENA),
+	.layout(~double_sided[0]),	// 0 = Track-Side-Sector, 1 - Side-Track-Sector
+	.side(double_sided[0] & DRIVE_SEL_EXT[3]),
 	.ready(drive_ready[0]),
 
 	.input_active(0),
@@ -504,8 +517,8 @@ wd1793 #(1,0) coco_wd1793_1
 	.wp(drive_wp[1]),
 
 	.size_code(3'd5),		// 5 is 18 sector x 256 bits COCO standard
-	.layout(1'b1),			// 0 = Track-Side-Sector, 1 - Side-Track-Sector
-	.side(DS_ENA),
+	.layout(~double_sided[1]),	// 0 = Track-Side-Sector, 1 - Side-Track-Sector
+	.side(double_sided[1] & DRIVE_SEL_EXT[3]),
 	.ready(drive_ready[1]),
 
 	.input_active(0),
@@ -545,8 +558,8 @@ wd1793 #(1,0) coco_wd1793_2
 	.wp(drive_wp[2]),
 
 	.size_code(3'd5),		// 5 is 18 sector x 256 bits COCO standard
-	.layout(1'b1),			// 0 = Track-Side-Sector, 1 - Side-Track-Sector
-	.side(DS_ENA),
+	.layout(~double_sided[2]),	// 0 = Track-Side-Sector, 1 - Side-Track-Sector
+	.side(double_sided[2] & DRIVE_SEL_EXT[3]),
 	.ready(drive_ready[2]),
 
 	.input_active(0),
