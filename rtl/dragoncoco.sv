@@ -320,11 +320,11 @@ cpu09 GLBCPU09(
 	.rw(cpu_rw),
 	.data_in(dragon64?cpu_din64:cpu_din),
 	.data_out(cpu_dout),
-	//.halt( dragon ? 1'b0 : halt),
-	.halt( halt),
+	.halt( dragon ? 1'b0 : halt),
+	//.halt( halt),
 	.hold(1'b0),
 	.irq(irq),
-	.firq(firq),
+	.firq(firq| cart_firq),
 	.nmi(nmi)
 );
 
@@ -462,8 +462,8 @@ dpram #(.addr_width_g(14), .data_width_g(8)) romC(
   .wren_b(ioctl_wr & load_cart)
 );
 
-/*dragon_dsk*/
-dratrs dragon_disk_rom(
+dragon_dsk
+/*dratrs*/ dragon_disk_rom(
   .clk(clk),
   .addr(cpu_addr[12:0]),
   .dout(romC_dragondisk_dout),
@@ -835,22 +835,33 @@ wire    wd1793_data_read;
 wire    wd1793_read;
 wire    wd1793_write;
 
-assign     ff40_write = (clk_E && io_cs && ({cpu_rw, cpu_addr[3:0]} == 5'b00000));
+wire [3:0] floppy_addr = {~cpu_addr[3],cpu_addr[2:0]};
 
-assign    FF40_read =            ({io_cs, cpu_addr[3:0]} == 5'h10);
-assign    wd1793_data_read =    (io_cs && cpu_addr[3]);
+//assign    FF40_ENA =            ({clk_e_enable, cpu_rw, io_cs, floppy_addr[3:0]} == 7'B1010000) ? 1'b1 : 1'b0;
 
-assign    wd1793_read =        (cpu_rw && io_cs && cpu_addr[3] & (clk_E || clk_Q));
-assign    wd1793_write =        (~cpu_rw && io_cs && cpu_addr[3] && clk_E);
+//assign    wd1793_read =        (cpu_rw && io_cs && floppy_addr[3]);
+//assign    wd1793_write =        (~cpu_rw && io_cs && floppy_addr[3]);
 
+
+
+
+assign     ff40_write = (clk_E && io_cs && ({cpu_rw, floppy_addr[3:0]} == 5'b00000));
+
+assign    FF40_read =            ({io_cs, floppy_addr[3:0]} == 5'h10);
+assign    wd1793_data_read =    (io_cs && floppy_addr[3]);
+
+assign    wd1793_read =        (cpu_rw && io_cs && floppy_addr[3] & (clk_E || clk_Q));
+assign    wd1793_write =        (~cpu_rw && io_cs && floppy_addr[3] && clk_E);
+wire cart_firq;
 fdc coco_fdc(
     .CLK(CLK50MHZ),                     // clock
     .RESET_N(reset_n),                       // async reset
-    .ADDRESS(cpu_addr[1:0]),               // i/o port addr for wd1793 & FF48+
+    .ADDRESS(floppy_addr[1:0]),               // i/o port addr for wd1793 & FF48+
     .DATA_IN(cpu_dout),                    // data in
     .DATA_HDD(io_out),                  // data out
     .HALT(halt),                         // DMA request
     .NMI_09(nmi),
+	 .firq(cart_firq),
     .DS_ENABLE(1'b0),                    // DS support - '1 to enable drives 0-2
 
 //    FDC host r/w handling

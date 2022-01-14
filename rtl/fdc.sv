@@ -57,6 +57,7 @@ module fdc(
 	output 		[7:0] 	DATA_HDD,      	// data out
 	output       		HALT,         	// DMA request
 	output       		NMI_09,
+	output                  firq,
 
 	input				DS_ENABLE,		// Turn on DS support
 
@@ -119,14 +120,19 @@ begin
 end
 
 //FDC read data path.  =$ff40 or wd1793(s)
-assign	DATA_HDD =		(FF40_RD)							?	{HALT_EN, 
-																DRIVE_SEL_EXT[3],
-																DENSITY, 
-																WRT_PREC, 
-																MOTOR, 
-																DRIVE_SEL_EXT[2:0]}:
-						(WD1793_RD)							?	DATA_1793: //(1793[s])
-																8'h00;
+assign  DATA_HDD =              (FF40_RD)                                                       ?       {1'b0,
+   1'b0,
+   DENSITY,
+   WRT_PREC,
+   SINGLEDENSITY,
+   MOTOR,
+   DRIVE_SEL_EXT[1:0]}:
+   (WD1793_RD)                                                     ?       DATA_1793: //(1793[s])
+   8'h00;
+
+
+wire SINGLEDENSITY;
+
 
 // $ff40 control register [part 1]
 
@@ -155,11 +161,13 @@ begin
 		if (FF40_ENA)
 		begin
 			DRIVE_SEL_EXT <= 	{4'b0000,
-								DATA_IN[6],		// Drive Select [3] / Side Select
-								DATA_IN[2:0]};	// Drive Select [2:0]
-			MOTOR <= DATA_IN[3];				// Turn on motor, not used here just checked, 0=MotorOff 1=MotorOn
+								1'b0,
+								DATA_IN[1:0]};	// Drive Select [2:0]
+			MOTOR <= DATA_IN[2];				// Turn on motor, not used here just checked, 0=MotorOff 1=MotorOn
 			WRT_PREC <= DATA_IN[4];				// Write Precompensation, not used here
 			DENSITY <= DATA_IN[5];				// Density, not used here just checked
+			drive_index<=DRIVE_SEL_EXT[1:0];
+			/*
 			case(DRIVE_SEL_EXT_PRE)
 			4'b1000:
 				drive_index <= 3'd3;
@@ -182,6 +190,7 @@ begin
 			4'b1001:
 				drive_index <= 3'd0;
 			endcase
+			*/
 		end
 	end
 end
@@ -349,6 +358,7 @@ assign	NMI_09	=	DENSITY & selected_INTRQ;				// Send NMI if Double Density (Halt
 
 //	HALT from disk controller
 //	Selected DRQ
+assign firq = selected_DRQ;
 assign	selected_DRQ	=	(drive_index == 3'd0)	?	DRQ[0]:
 							(drive_index == 3'd1)	?	DRQ[1]:
 							(drive_index == 3'd2)	?	DRQ[2]:

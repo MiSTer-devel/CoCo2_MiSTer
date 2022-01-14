@@ -19,6 +19,7 @@ set_global_assignment -name VERILOG_FILE roms/dragon_ext64.v
 set_global_assignment -name VERILOG_FILE roms/dragon_alt_bas64.v
 set_global_assignment -name VERILOG_FILE roms/dragon_alt_ext64.v
 set_global_assignment -name VERILOG_FILE roms/dratrs.v
+set_global_assignment -name VERILOG_FILE roms/dplus.v
 set_global_assignment -name VERILOG_FILE roms/rom_bas.v
 set_global_assignment -name VERILOG_FILE roms/rom_chrrom.v
 set_global_assignment -name VERILOG_FILE roms/rom_ext.v
