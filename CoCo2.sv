@@ -589,7 +589,11 @@ wire locked;
 wire [24:0] sdram_addr;
 wire [7:0] sdram_data;
 wire sdram_rd;
-wire load_tape = ioctl_index == 2;
+wire load_tape = ioctl_index[5:0] == 2;
+reg [24:0] tape_end;
+always @(posedge clk_sys) begin
+ if (load_tape) tape_end <= ioctl_addr;
+end
 
 sdram sdram
 (
@@ -610,7 +614,7 @@ cassette cassette(
   .clk(clk_sys),
   .Q(clk_Q_out),
 
-  .rewind(status[15]),
+  .rewind(status[15]| (load_tape&ioctl_download)),
   .en(cas_relay),
 
   .sdram_addr(sdram_addr),
@@ -621,7 +625,32 @@ cassette cassette(
 //   .status(tape_status)
 );
 
+wire [7:0] o_r;
+wire [7:0] o_g;
+wire [7:0] o_b;
 
+overlay  #( .RGB(24'hFFFFFF) ) coverlay
+(
+	.reset(reset),
+	.i_r(red),
+   .i_g(green),
+   .i_b(blue),
+
+	.i_clk(clk_sys),
+	.i_pix(CE_PIXEL),
+	
+	.hcnt(HCount),
+	.vcnt(VCount),
+	
+	.o_r(o_r),
+	.o_g(o_g),
+	.o_b(o_b),
+	
+	.pos(sdram_addr),
+	.max(tape_end),
+	
+	.ena(cas_relay)
+);
 
 assign CLK_VIDEO = clk_sys;
 
@@ -655,13 +684,13 @@ video_mixer #(.LINE_LENGTH(380), .GAMMA(1)) video_mixer
 
 `ifdef USE_OVERLAY
 	// mix in overlay!
-	wire [7:0]rr = red | {C_R,C_R};
-	wire [7:0]gg = green | {C_R,C_R};
-	wire [7:0]bb = blue | {C_R,C_R};
+	wire [7:0]rr = o_r | {C_R,C_R};
+	wire [7:0]gg = o_g | {C_R,C_R};
+	wire [7:0]bb = o_b | {C_R,C_R};
 `else
-	wire [7:0]rr = red;
-	wire [7:0]gg = green;
-	wire [7:0]bb = blue;
+	wire [7:0]rr = o_r;
+	wire [7:0]gg = o_g;
+	wire [7:0]bb = o_b;
 `endif
 
 reg  [26:0] act_cnt;

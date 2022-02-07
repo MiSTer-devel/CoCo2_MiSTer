@@ -1,0 +1,3 @@
+set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) overlay.v ]
+set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) charmap.v ]
+set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) bram.sv ]

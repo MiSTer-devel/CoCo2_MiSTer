@@ -325,8 +325,8 @@ cpu09 GLBCPU09(
 	.halt( halt),
 	.hold(1'b0),
 	.irq(irq),
-	.firq(firq| cart_firq ),
-	//.firq(firq ),
+	//.firq(firq| cart_firq ),
+	.firq(firq ),
 	.nmi(nmi)
 );
 
