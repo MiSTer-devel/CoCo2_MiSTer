@@ -19,6 +19,7 @@
 // Enable overlay (or not)
 `define USE_OVERLAY
 
+
 module emu
 (
 	//Master input clock
@@ -29,7 +30,7 @@ module emu
 	input         RESET,
 
 	//Must be passed to hps_io module
-	inout  [45:0] HPS_BUS,
+	inout  [48:0] HPS_BUS,
 
 	//Base video clock. Usually equals to CLK_SYS.
 	output        CLK_VIDEO,
@@ -281,7 +282,7 @@ wire	[3:0]		sd_ack;
 // SD byte level access. Signals for 2-PORT altsyncram.
 wire  [8:0] 	sd_buff_addr;
 wire  [7:0] 	sd_buff_dout;
-wire 	[7:0] 	sd_buff_din[4];
+wire  [7:0] 	sd_buff_din[4];
 wire        	sd_buff_wr;
 
 
@@ -331,15 +332,13 @@ hps_io #(.CONF_STR(CONF_STR),.VDNUM(4),.BLKSZ(2)) hps_io
 
 
 	.joystick_0(joy1),
-   .joystick_1(joy2),
+	.joystick_1(joy2),
 
-   .joystick_analog_0(joya1),
-   .joystick_analog_1(joya2),
-
+        .joystick_l_analog_0(joya1),
+        .joystick_l_analog_1(joya2),
 
 	.ps2_key(ps2_key),
 	.gamma_bus(gamma_bus)
-
 );
 
 
@@ -633,8 +632,8 @@ overlay  #( .RGB(24'hFFFFFF) ) coverlay
 (
 	.reset(reset),
 	.i_r(red),
-   .i_g(green),
-   .i_b(blue),
+	.i_g(green),
+	.i_b(blue),
 
 	.i_clk(clk_sys),
 	.i_pix(CE_PIXEL),
@@ -648,6 +647,7 @@ overlay  #( .RGB(24'hFFFFFF) ) coverlay
 	
 	.pos(sdram_addr),
 	.max(tape_end),
+	.tape_data(sdram_data),
 	
 	.ena(cas_relay)
 );
