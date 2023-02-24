@@ -19,7 +19,6 @@
 // Enable overlay (or not)
 `define USE_OVERLAY
 
-
 module emu
 (
 	//Master input clock
@@ -53,13 +52,14 @@ module emu
 	output        VGA_F1,
 	output [1:0]  VGA_SL,
 	output        VGA_SCALER, // Force VGA scaler
+	output        VGA_DISABLE, // analog out is off
 
 	input  [11:0] HDMI_WIDTH,
 	input  [11:0] HDMI_HEIGHT,
 	output        HDMI_FREEZE,
 
 `ifdef MISTER_FB
-	// Use framebuffer in DDRAM (USE_FB=1 in qsf)
+	// Use framebuffer in DDRAM
 	// FB_FORMAT:
 	//    [2:0] : 011=8bpp(palette) 100=16bpp 101=24bpp 110=32bpp
 	//    [3]   : 0=16bits 565 1=16bits 1555
@@ -174,6 +174,7 @@ module emu
 	input         OSD_STATUS
 );
 
+
 ///////// Default values for ports not used in this core /////////
 
 //assign ADC_BUS  = 'Z;
@@ -184,6 +185,7 @@ assign {SDRAM_DQ, SDRAM_A, SDRAM_BA, SDRAM_CLK, SDRAM_CKE, SDRAM_DQML, SDRAM_DQM
 assign {DDRAM_CLK, DDRAM_BURSTCNT, DDRAM_ADDR, DDRAM_DIN, DDRAM_BE, DDRAM_RD, DDRAM_WE} = '0;
 
 assign VGA_F1 = 0;
+assign VGA_DISABLE = 0;
 assign VGA_SCALER = 0;
 
 assign AUDIO_S = 0;
@@ -229,6 +231,7 @@ localparam CONF_STR = {
 	"H0F2,CAS,Load Cassette;",
 	"H0TF,Stop & Rewind;",
 	"OD,Monitor Tape Sound,No,Yes;",
+   "OG,Show Tape Status,Yes,No;",
 	"-;",
 	"P1,Video Settings;",
 	"P1-;",
@@ -334,8 +337,8 @@ hps_io #(.CONF_STR(CONF_STR),.VDNUM(4),.BLKSZ(2)) hps_io
 	.joystick_0(joy1),
 	.joystick_1(joy2),
 
-        .joystick_l_analog_0(joya1),
-        .joystick_l_analog_1(joya2),
+	.joystick_l_analog_0(joya1),
+	.joystick_l_analog_1(joya2),
 
 	.ps2_key(ps2_key),
 	.gamma_bus(gamma_bus)
@@ -440,6 +443,9 @@ wire [31:0] coco_joy2 = status[10] ? joy1 : joy2;
 
 wire [15:0] coco_ajoy1 = status[10] ? {center_joystick_x2[7:0],center_joystick_y2[7:0]} : {center_joystick_x1[7:0],center_joystick_y1[7:0]};
 wire [15:0] coco_ajoy2 = status[10] ? {center_joystick_x1[7:0],center_joystick_y1[7:0]} : {center_joystick_x2[7:0],center_joystick_y2[7:0]};
+
+wire show_cas_overlay = ~status[16];
+
 
 wire casdout;
 wire cas_relay;
@@ -649,7 +655,7 @@ overlay  #( .RGB(24'hFFFFFF) ) coverlay
 	.max(tape_end),
 	.tape_data(sdram_data),
 	
-	.ena(cas_relay)
+	.ena(cas_relay & show_cas_overlay)
 );
 
 assign CLK_VIDEO = clk_sys;
