@@ -1,0 +1,14 @@
+CoCo2_20240605
+1.	Fixed MiSTer / CoCo2 interface preventing the joysticks ever reaching the
+	max value of 63. Specifically '>' was changed to '>=' the DTOA values.
+	Additionally, fixed DPAD emulation to reach extremes for all buttoms. 
+	This is verified in Tandy Diagnostics. 
+
+To Do...
+1:	Get FDC working for dragon
+3:	Change back to Cycle accurate 09
+4:	Add Cassette Save
+5:	Update the Template
+6:	Add Daily Build Number
+7:	Create compatible software tested spreadsheet
+8:	Fix double speed poke in the SAM

@@ -48,25 +48,27 @@ always @(posedge clk) begin
     sound<=11'b0;
   end
 end
+
+//	Fixed missing end value of 63 by changing > to >= SRH 6/5/24
 always @(posedge clk) begin
   case ({selb,sela})
   2'b00:
-		if (joya2[15:10] > dac)
+		if (joya2[15:10] >= dac)
 			hilo<=1;
 		else
 			hilo<=0;
   2'b01:
-  		if (joya2[7:2] > dac)
+  		if (joya2[7:2] >= dac)
 			hilo<=1;
 		else
 			hilo<=0;
 2'b10:
-		if (joya1[15:10] > dac)
+		if (joya1[15:10] >= dac)
 			hilo<=1;
 		else
 			hilo<=0;
   2'b11:
-  		if (joya1[7:2] > dac)
+  		if (joya1[7:2] >= dac)
 			hilo<=1;
 		else
 			hilo<=0;

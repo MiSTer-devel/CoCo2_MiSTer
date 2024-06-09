@@ -761,6 +761,7 @@ keyboard kb(
 reg [15:0] dac_joya1;
 reg [15:0] dac_joya2;
 
+//	Limits for joysticks - set to total limits 0,255 SRH 6/5/24
 always @(clk) begin
 
 	if (joy_use_dpad)
@@ -772,28 +773,28 @@ always @(clk) begin
 		dac_joya2[7:0]  <= 8'd128;
 		
 		if (joy1[0])	// right
-			dac_joya1[15:8] <= 8'd240;
+			dac_joya1[15:8] <= 8'd255;
 
 		if (joy1[1])	// left
-			dac_joya1[15:8] <= 8'd16;
+			dac_joya1[15:8] <= 8'd0;
 		
 		if (joy1[2])	// down
-			dac_joya1[7:0] <= 8'd240;
+			dac_joya1[7:0] <= 8'd255;
 
 		if (joy1[3])	// up
-			dac_joya1[7:0] <= 8'd16;
+			dac_joya1[7:0] <= 8'd0;
 		
 		if (joy2[0])	// right
-			dac_joya2[15:8] <= 8'd240;
+			dac_joya2[15:8] <= 8'd255;
 
 		if (joy2[1])	// left
-			dac_joya2[15:8] <= 8'd16;
+			dac_joya2[15:8] <= 8'd0;
 		
 		if (joy2[2])	// down
-			dac_joya2[7:0] <= 8'd240;
+			dac_joya2[7:0] <= 8'd255;
 
 		if (joy2[3])	// upimg_mounted
-			dac_joya2[7:0] <= 8'd16;
+			dac_joya2[7:0] <= 8'd0;
 	  end
 	else
 	  begin
