@@ -216,6 +216,8 @@ assign VIDEO_ARY = (!ar) ? 12'd3 : 12'd0;
 
 
 `include "build_id.v"
+`include "build_id_num.v"
+
 localparam CONF_STR = {
 	"CoCo2;;",
 	"-;",
@@ -251,13 +253,15 @@ localparam CONF_STR = {
 	"O89,Machine,CoCo2,Dragon32,Dragon64;",
 	"O7,Turbo,Off,On;",
 	"-;",
+`ifdef USE_OVERLAY
 	"OB,Debug display,Off,On;",
 	"-;",
+`endif
 	"RN,Hard Reset;",
 	"R0,Reset;",
 	"J,Button;",
 	"jn,A;",
-	"V,v",`BUILD_DATE
+    "V,v",{`BUILD_DATE,"-",`BUILD_NUMBER}
 };
 
 wire forced_scandoubler;
