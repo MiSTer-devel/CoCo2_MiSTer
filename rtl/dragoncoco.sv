@@ -2,7 +2,7 @@
 
 // todo: find a better name
 module dragoncoco(
-  input clk, // 42.954 mhz
+  input clk, // 57.272727 mhz
   input turbo,
   input reset_n, // todo: reset_n doesn't work!
   input hard_reset,
@@ -113,7 +113,7 @@ begin
 	else
 	begin
 		clk_14M318_ena <= 0;
-		if (count == 'd2)
+		if (count == 'd3)
 		begin
 		  clk_14M318_ena <= 1;
         count <= 0;
@@ -274,7 +274,7 @@ always_comb begin
      default:    cpu_din64 =  8'hff;
    endcase
 end
-/*
+
 mc6809i cpu(
   .clk(clk),
   .D(dragon64?cpu_din64:cpu_din),
@@ -286,7 +286,7 @@ mc6809i cpu(
   .BS(cpu_bs),
   .BA(cpu_ba),
   .nIRQ(~irq),
-  .nFIRQ(~firq),
+  .nFIRQ(~firq & (dragon ? ~cart_firq : 1'b1)),
   .nNMI(~nmi),
   .AVMA(cpu_adv_valid_addr),
   .BUSY(cpu_busy),
@@ -295,40 +295,40 @@ mc6809i cpu(
   .nRESET(reset_n),
   .nDMABREQ(1)
 );
-*/
+
 
 // CPU section copyrighted by John Kent
-reg clk_e_enable;
-reg e_r;
-always @(negedge clk)
-begin
-    e_r<=clk_E;
-    clk_e_enable<=0;
-    if (clk_E==0 && e_r ==1) 
-		clk_e_enable<=1;
-end
-cpu09 GLBCPU09(
+//reg clk_e_enable;
+//reg e_r;
+//always @(negedge clk)
+//begin
+//    e_r<=clk_E;
+//    clk_e_enable<=0;
+//    if (clk_E==0 && e_r ==1) 
+//		clk_e_enable<=1;
+//end
+//cpu09 GLBCPU09(
 	//.clk(clk_E),
 	//.ce(1'b1),
-	.clk(clk),
-	.ce(clk_e_enable),
-	.rst(~reset_n),
-	.vma(cpu_adv_valid_addr),
-	.lic_out(cpu_last_inst_cycle),
-	.addr(cpu_addr),
-	.bs(cpu_bs),
-	.ba(cpu_ba),
-	.rw(cpu_rw),
-	.data_in(dragon64?cpu_din64:cpu_din),
-	.data_out(cpu_dout),
+//	.clk(clk),
+//	.ce(clk_e_enable),
+//	.rst(~reset_n),
+//	.vma(cpu_adv_valid_addr),
+//	.lic_out(cpu_last_inst_cycle),
+//	.addr(cpu_addr),
+//	.bs(cpu_bs),
+//	.ba(cpu_ba),
+//	.rw(cpu_rw),
+//	.data_in(dragon64?cpu_din64:cpu_din),
+//	.data_out(cpu_dout),
 	//.halt( dragon ? 1'b0 : halt),
-	.halt( halt),
-	.hold(1'b0),
-	.irq(irq),
+//	.halt( halt),
+//	.hold(1'b0),
+//	.irq(irq),
 	//.firq(firq| cart_firq ),
-	.firq(firq ),
-	.nmi(nmi)
-);
+//	.firq(firq ),
+//	.nmi(nmi)
+//);
 
 
 
@@ -447,8 +447,8 @@ reg cart_loaded;
 always @(posedge clk)
   if (load_cart & ioctl_download & ~ioctl_wr)
     cart_loaded <= ioctl_addr > 15'h100;
-	else if (disk_cart_enabled)
-    cart_loaded <= 1'b1;
+//	else if (disk_cart_enabled)	// Disk Basic does not cause a interrupt.
+//    cart_loaded <= 1'b1;
 
 wire load_cart = ioctl_index == 1;
 
@@ -537,6 +537,8 @@ begin
 end
 			//assign ram_dout=vdg_data;
 
+wire	WR_CK_ENA;
+wire 	VClk;
 
 mc6883 sam(
 			.clk(clk),
@@ -550,7 +552,7 @@ mc6883 sam(
 			//-- vdg signals
 			.da0(da0),
 			.hs_n(hs_n),
-			.vclk(), // not sure why this clock doesn't work to put it into the video chip
+			.vclk(VClk), // not sure why this clock doesn't work to put it into the video chip
 
 			//-- peripheral address selects
 			.s_device_select(s_device_select),
@@ -567,6 +569,8 @@ mc6883 sam(
 			.cas_n(cas_n),
 			.we_n(sam_we_n),
 
+			.WR_CK_ENA(WR_CK_ENA),
+			
 			.dbg()//sam_dbg
 );
 
@@ -595,6 +599,7 @@ ttl_74ls138_p u11(
 .c(s_device_select[2]),
 .g1(1),//comes from CART_SLENB#
 .g2a(1),//come from E NOR cs_sel(2)
+//.g2b(clk_E),
 .g2b(1),
 //.g2a( ~(cpu_rw | S[2])),
 //.g2b(~(E| S[2])),//come from E NOR cs_sel(2)
@@ -666,18 +671,19 @@ assign DLine1 = {
 
 5'b10000,						// space
 5'b11111,						// '#'  (to mark the data)
-1'b0,pia1_portb_out[7:4],
+4'b0000, cas_relay,
 5'b10000,						// space
 
 5'b10101,						// '>'  (to mark the data)
-1'b0,pia1_portb_out[3:0],
+4'b0000, turbo,
 5'b10000,						// space
 
 5'b11010,						// ':'  (to mark the data)
 3'b0,ram_dout_b[7:6],
 5'b10000,						// space
 
-110'b0};
+{22{5'b10000}}
+};
 
 // two is a copy of 1 for now, but we will use this for debugging
 // the disk controller
@@ -696,11 +702,13 @@ assign DLine2 = {
 3'b0,ram_dout_b[7:6],
 5'b10000,						// space
 
-110'b0};
+{22{5'b10000}}
+};
 
 mc6847pace vdg(
   .clk(clk),
-  .clk_ena(clk_enable),//VClk - vclk doesn't seem to work
+//  .clk_ena(clk_enable),//VClk - vclk doesn't seem to work
+  .clk_ena(VClk),//VClk - vclk doesn't seem to work
   .reset(~reset_n),
   .da0(da0),
   .dd(ram_dout_b),
@@ -830,7 +838,7 @@ acia acia (
 //
 //  Floppy Controller Support
 //
-//  This isn't tested for dragon yet
+//  This isn't tested / modified for dragon yet
 
 wire    ff40_write;
 wire    FF40_read;
@@ -838,16 +846,17 @@ wire    wd1793_data_read;
 wire    wd1793_read;
 wire    wd1793_write;
 
-assign     ff40_write = (clk_E && io_cs && ({cpu_rw, cpu_addr[3:0]} == 5'b00000));
+assign     ff40_write = (WR_CK_ENA && io_cs && ({cpu_rw, cpu_addr[3:0]} == 5'b00000));
 
 assign    FF40_read =            ({io_cs, cpu_addr[3:0]} == 5'h10);
 assign    wd1793_data_read =    (io_cs && cpu_addr[3]);
 
 assign    wd1793_read =        (cpu_rw && io_cs && cpu_addr[3] & (clk_E || clk_Q));
-assign    wd1793_write =        (~cpu_rw && io_cs && cpu_addr[3] && clk_E);
+assign    wd1793_write =        (~cpu_rw && io_cs && cpu_addr[3] && WR_CK_ENA);
 
 fdc coco_fdc(
-    .CLK(CLK50MHZ),                     // clock
+    .CLK(clk),                     // clock
+//    .CLK(CLK50MHZ),                     // clock
     .RESET_N(reset_n),                       // async reset
     .ADDRESS(cpu_addr[1:0]),               // i/o port addr for wd1793 & FF48+
     .DATA_IN(cpu_dout),                    // data in

@@ -1,14 +1,20 @@
-CoCo2_20240622 - 005
+CoCo2_20240701 - 008
 1:	Prelim recursion testing spreadsheet completed.
 2:	Updated MiSTer template
 3:	Added Daily Build Number.  Note sys/build_num.tcl changed to add this functionality.
 	Updating the template in the future will need to restore this version to prevent
 	the loss of this functtion.
+4:  Change back to Cycle accurate 09
+5:  Fixed Timer [The FDC cartridge does not generate a FIRQ when asserted.  This was fixed..]
+6:  Preliminary double speed poke in the SAM via SAM registers coded.  WIP
+7:  FDC changed to use system clk and divide to 8 Mhz changed to /6.  FIRQ generation
+    for Dragon, qualified enabled only in Dragon configurations.
+
+Issues:
+1:  Highspeed pokes may be backwards.  Full 1.78Mhz seems to have a video issue.
 
 
 To Do...
-1:    Change back to Cycle accurate 09
 2:    Add Cassette Save
-3:    Fix double speed poke in the SAM
 4:    Get FDC working for dragon (edited)
 

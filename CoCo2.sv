@@ -264,6 +264,14 @@ localparam CONF_STR = {
     "V,v",{`BUILD_DATE,"-",`BUILD_NUMBER}
 };
 
+
+//   Status Bit Map:
+//               Upper                             Lower              
+//   0         1         2         3          4         5         6   
+//   01234567890123456789012345678901 23456789012345678901234567890123
+//   0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
+// 
+
 wire forced_scandoubler;
 wire  [1:0] buttons;
 wire [31:0] status;
@@ -515,7 +523,7 @@ end
 
 dragoncoco dragoncoco(
   .clk(clk_sys), // 50 mhz
-  .turbo(status[7]&cas_relay),
+  .turbo(status[7]),
   .reset_n(~reset),
   .hard_reset(hard_reset),
   .dragon(dragon),

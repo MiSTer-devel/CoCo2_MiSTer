@@ -104,7 +104,8 @@ assign probe = {2'd0, HALT_EN_RST, sd_buff_wr, WR[0], RD[0], HALT_EN, HALT};
 wire ena_8Mhz;
 wire [5:0]	div_8mhz;
 
-assign ena_8Mhz = (div_8mhz == 6'd5) ? 1'b1: 1'b0;
+assign ena_8Mhz = (div_8mhz == 6'd6) ? 1'b1: 1'b0;
+//assign ena_8Mhz = (div_8mhz == 6'd5) ? 1'b1: 1'b0;
 
 always@(negedge CLK or negedge RESET_N)
 begin
