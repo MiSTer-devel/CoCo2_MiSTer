@@ -109,18 +109,18 @@ reg [1:0] count;
 always @(posedge clk)
 begin
 	if (~reset_n)
-		count<=0;
+		count<=2'd0;
 	else
 	begin
 		clk_14M318_ena <= 0;
-		if (count == 'd3)
+		if (count == 2'd3)
 		begin
 		  clk_14M318_ena <= 1;
-        count <= 0;
+        count <= 2'd0;
 		end
 		else
 		begin
-			count<=count+1;
+			count<=count+2'd1;
 		end
 	end
 end
@@ -131,18 +131,18 @@ reg [1:0] count2;
 always @(posedge clk)
 begin
 	if (~reset_n)
-		count2<=0;
+		count2<=2'd0;
 	else
 	begin
 		clk_28M_ena <= 0;
-		if (count2 == 'd1)
+		if (count2 == 2'd1)
 		begin
 		  clk_28M_ena <= 1;
-        count2 <= 0;
+        count2 <= 2'd0;
 		end
 		else
 		begin
-			count2<=count2+1;
+			count2<=count2+2'd1;
 		end
 	end
 end
@@ -444,9 +444,22 @@ dragon_alt_bas64 romA_D64_2(
 
 // there must be another solution
 reg cart_loaded;
-always @(posedge clk)
-  if (load_cart & ioctl_download & ~ioctl_wr)
+wire disk_cart_enabled_d ; // to detect disk_cart_enabled changes
+wire ioctl_download_d ; // to detect ioctl_download changes
+
+always @(posedge clk) begin
+  disk_cart_enabled_d <= disk_cart_enabled ;
+  ioctl_download_d <= ioctl_download ;  
+   if (~ioctl_download & ioctl_download_d) 
     cart_loaded <= ioctl_addr > 15'h100;
+	else if (disk_cart_enabled)
+    cart_loaded <= 1'b1;
+	else if (disk_cart_enabled_d)
+	 cart_loaded <= 1'b0; // If back to cart, empty the slot.
+end
+  
+//  if (load_cart & ioctl_download & ~ioctl_wr)
+//    cart_loaded <= ioctl_addr > 15'h100;
 //	else if (disk_cart_enabled)	// Disk Basic does not cause a interrupt.
 //    cart_loaded <= 1'b1;
 
@@ -456,7 +469,7 @@ dpram #(.addr_width_g(14), .data_width_g(8)) romC(
   .clock_a(clk),
   .address_a(cpu_addr[13:0]),
   .q_a(romC_cart_dout),
-  .enable_a(romC_cs),
+  .enable_a(romC_cs & cart_loaded),  // if no cart, no enable, so we can dismount it for real
 
   .clock_b(clk),
   .address_b(ioctl_addr[13:0]),
@@ -770,7 +783,7 @@ reg [15:0] dac_joya1;
 reg [15:0] dac_joya2;
 
 //	Limits for joysticks - set to total limits 0,255 SRH 6/5/24
-always @(clk) begin
+always @(negedge clk) begin
 
 	if (joy_use_dpad)
 	  begin

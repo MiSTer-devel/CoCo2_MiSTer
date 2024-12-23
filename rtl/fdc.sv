@@ -54,7 +54,7 @@ module fdc(
 	input        		RESET_N,	   	// async reset
 	input  		[1:0]	ADDRESS,       	// i/o port addr [extended for coco]
 	input  		[7:0]	DATA_IN,        // data in
-	output 		[7:0] 	DATA_HDD,      	// data out
+	output 		[7:0] DATA_HDD,      	// data out
 	output       		HALT,         	// DMA request
 	output       		NMI_09,
 	output       		FIRQ,
@@ -387,6 +387,8 @@ reg       drive_wp[4];
 reg       [3:0] drive_ready  = 4'B0;
 reg       [3:0] double_sided = 4'B0;
 
+wire [3:0] img_mounted_d ;
+
 // As drives are mounted in MISTer this logic saves the write protect and generates ready for
 // changing drives to the wd1793.
 // This can also get the disk size to properly handle DS drives - TBD
@@ -395,38 +397,51 @@ reg       [3:0] double_sided = 4'B0;
 
 // Drive 0
 
-always @(negedge img_mounted[0])
+always @(negedge CLK)
 begin
-	drive_wp[0] <= img_readonly;
-	drive_ready[0] <= 1'b1;
-	double_sided[0]<= img_size > 20'd368600;//20'd368640;
+   img_mounted_d[0] <= img_mounted[0] ;
+	if (img_mounted[0] & ~img_mounted_d[0]) begin
+		drive_wp[0] <= img_readonly;
+		drive_ready[0] = (img_size!=20'd0) ; 
+		// drive_ready[0] <= 1'b1;
+		double_sided[0]<= img_size > 20'd368600;//20'd368640;
+	end
 end
 
 // Drive 1
 
-always @(negedge img_mounted[1])
+always @(negedge CLK)
 begin
-	drive_wp[1] <= img_readonly;
-	drive_ready[1] <= 1'b1;
-	double_sided[1]<= img_size > 20'd368600;//20'd368640;
+   img_mounted_d[1] <= img_mounted[1] ;
+	if (img_mounted[1] & ~img_mounted_d[1]) begin
+		drive_wp[1] <= img_readonly;
+		drive_ready[1] = (img_size!=20'd0) ; 
+		double_sided[1]<= img_size > 20'd368600;//20'd368640;
+	end
 end
 
 // Drive 2
 
-always @(negedge img_mounted[2])
+always @(negedge CLK)
 begin
-	drive_wp[2] <= img_readonly;
-	drive_ready[2] <= 1'b1;
-	double_sided[2]<= img_size > 20'd368600;//20'd368640;
+   img_mounted_d[2] <= img_mounted[2] ;
+	if (img_mounted[2] & ~img_mounted_d[2]) begin
+		drive_wp[2] <= img_readonly;
+		drive_ready[2] = (img_size!=20'd0) ; 
+		double_sided[2]<= img_size > 20'd368600;//20'd368640;
+	end
 end
 
 // Drive 3
 
-always @(negedge img_mounted[3])
+always @(negedge CLK)
 begin
-	drive_wp[3] <= img_readonly;
-	drive_ready[3] <= 1'b1;
-	//double_sided[3]<= img_size > 20'd368600;//20'd368640;
+   img_mounted_d[3] <= img_mounted[3] ;
+	if (img_mounted[3] & ~img_mounted_d[3]) begin
+		drive_wp[3] <= img_readonly;
+		drive_ready[3] = (img_size!=20'd0) ; 
+		//double_sided[3]<= img_size > 20'd368600;//20'd368640;
+	end
 end
 
 
