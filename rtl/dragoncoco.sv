@@ -492,7 +492,7 @@ rom_dsk tandy_disk_rom(
   .cs(romC_cs )
  );
 
- assign romC_dout = disk_cart_enabled ? (dragon ? romC_dragondisk_dout :romC_disk_dout ) : romC_cart_dout;
+assign romC_dout = disk_cart_enabled ? (dragon ? romC_dragondisk_dout :romC_disk_dout ) : romC_cart_dout;
 
 
 wire [2:0] s_device_select;
@@ -858,18 +858,21 @@ wire    FF40_read;
 wire    wd1793_data_read;
 wire    wd1793_read;
 wire    wd1793_write;
+wire	  dragon_addr3; 		
 
-assign     ff40_write = (WR_CK_ENA && io_cs && ({cpu_rw, cpu_addr[3:0]} == 5'b00000));
+assign 	dragon_addr3 = dragon ^ cpu_addr[3] ;
+assign   ff40_write = (WR_CK_ENA && io_cs && ({cpu_rw, dragon_addr3, cpu_addr[2:0]} == 5'b00000));
 
-assign    FF40_read =            ({io_cs, cpu_addr[3:0]} == 5'h10);
-assign    wd1793_data_read =    (io_cs && cpu_addr[3]);
+assign   FF40_read =            ({io_cs, dragon_addr3, cpu_addr[2:0]} == 5'h10);
+assign   wd1793_data_read =    (io_cs && dragon_addr3);
 
-assign    wd1793_read =        (cpu_rw && io_cs && cpu_addr[3] & (clk_E || clk_Q));
-assign    wd1793_write =        (~cpu_rw && io_cs && cpu_addr[3] && WR_CK_ENA);
+assign   wd1793_read =        (cpu_rw && io_cs && dragon_addr3 & (clk_E || clk_Q));
+assign   wd1793_write =        (~cpu_rw && io_cs && dragon_addr3 && WR_CK_ENA);
 
 fdc coco_fdc(
     .CLK(clk),                     // clock
 //    .CLK(CLK50MHZ),                     // clock
+	 .dragon(dragon),
     .RESET_N(reset_n),                       // async reset
     .ADDRESS(cpu_addr[1:0]),               // i/o port addr for wd1793 & FF48+
     .DATA_IN(cpu_dout),                    // data in
