@@ -122,8 +122,8 @@ end
 
 localparam SDC_MAGIC_CMD = 			4'd0;
 
-wire	[7:0]	FF40_READ_VALUE = {HALT_EN, DRIVE_SEL_EXT[3], DENSITY, WRT_PREC, MOTOR,	DRIVE_SEL_EXT[2:0]};
-wire			SDC_EN = (FF40_READ_VALUE == SDC_MAGIC_CMD);
+wire	[7:0]	FF40_READ_VALUE = dragon ? 8'h00 : {HALT_EN, DRIVE_SEL_EXT[3], DENSITY, WRT_PREC, MOTOR,	DRIVE_SEL_EXT[2:0]};
+wire			SDC_EN = dragon ? 1'b0 : (FF40_READ_VALUE == SDC_MAGIC_CMD) ;
 wire	[7:0]	SDC_READ_DATA;
 
 assign SDC_READ_DATA = 8'h00;  // To be deleted.
@@ -163,7 +163,7 @@ begin
 			begin
 				drive_index <= { ~DATA_IN[2], DATA_IN[1:0] } ; //bit2='0 means no drive selected and no motor 
 				MOTOR <= DATA_IN[2];
-				DRIVE_SEL_EXT <= DATA_IN ; // only for DRIVE_SEL_EXT[3] 
+				DRIVE_SEL_EXT <= DATA_IN ; // only for DRIVE_SEL_EXT[3] for double-density 
 				DENSITY <= DATA_IN[5] ;
 			end else begin
 				DRIVE_SEL_EXT <= 	{4'b0000,

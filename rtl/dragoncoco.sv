@@ -286,12 +286,14 @@ mc6809i cpu(
   .BS(cpu_bs),
   .BA(cpu_ba),
   .nIRQ(~irq),
-  .nFIRQ(~firq & (dragon ? ~cart_firq : 1'b1)),
+//  .nFIRQ(~firq & (dragon ? ~cart_firq : 1'b1)),
+  .nFIRQ(~firq),
   .nNMI(~nmi),
   .AVMA(cpu_adv_valid_addr),
   .BUSY(cpu_busy),
   .LIC(cpu_last_inst_cycle),
-  .nHALT(dragon ? 1'b1 : ~halt),
+  //.nHALT(dragon ? 1'b1 : ~halt),
+  .nHALT(~halt),
   .nRESET(reset_n),
   .nDMABREQ(1)
 );
@@ -451,7 +453,7 @@ always @(posedge clk) begin
   disk_cart_enabled_d <= disk_cart_enabled ;
   ioctl_download_d <= ioctl_download ;  
    if (~ioctl_download & ioctl_download_d) 
-    cart_loaded <= ioctl_addr > 15'h100;
+    cart_loaded <= ioctl_addr > 15'h100;  // there is an image there if not 0
 	else if (disk_cart_enabled)
     cart_loaded <= 1'b1;
 	else if (disk_cart_enabled_d)
@@ -669,7 +671,8 @@ pia6520 pia1(
   .DDRB(DDRB),
   .ca1_in(dragon64?1'b1:1'b0), // from dragon64 schematic - this should be held high
   .ca2_in(),
-  .cb1_in(cart_loaded & reset_n & clk_Q), // cartridge inserted
+//  .cb1_in(cart_loaded & reset_n & clk_Q), // cartridge inserted
+  .cb1_in(disk_cart_enabled & dragon ? cart_firq : cart_loaded & reset_n & clk_Q), // cartridge inserted 
   .cb2_in(),
   .ca2_out(cas_relay),
   .cb2_out(snden),
@@ -858,16 +861,17 @@ wire    FF40_read;
 wire    wd1793_data_read;
 wire    wd1793_read;
 wire    wd1793_write;
-wire	  dragon_addr3; 		
+wire	  dragon_addr3, dragon_addr2; 		
 
+assign 	dragon_addr2 = dragon_addr3 && ~(dragon && cpu_addr[2]) ; 
 assign 	dragon_addr3 = dragon ^ cpu_addr[3] ;
 assign   ff40_write = (WR_CK_ENA && io_cs && ({cpu_rw, dragon_addr3, cpu_addr[2:0]} == 5'b00000));
 
 assign   FF40_read =            ({io_cs, dragon_addr3, cpu_addr[2:0]} == 5'h10);
-assign   wd1793_data_read =    (io_cs && dragon_addr3);
+assign   wd1793_data_read =    (io_cs && dragon_addr2);
 
-assign   wd1793_read =        (cpu_rw && io_cs && dragon_addr3 & (clk_E || clk_Q));
-assign   wd1793_write =        (~cpu_rw && io_cs && dragon_addr3 && WR_CK_ENA);
+assign   wd1793_read =        (cpu_rw && io_cs && dragon_addr2 && (clk_E || clk_Q));
+assign   wd1793_write =        (~cpu_rw && io_cs && dragon_addr2 && WR_CK_ENA);
 
 fdc coco_fdc(
     .CLK(clk),                     // clock
