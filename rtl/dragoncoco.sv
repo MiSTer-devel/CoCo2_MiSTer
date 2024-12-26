@@ -109,18 +109,18 @@ reg [1:0] count;
 always @(posedge clk)
 begin
 	if (~reset_n)
-		count<=0;
+		count<=2'd0;
 	else
 	begin
 		clk_14M318_ena <= 0;
-		if (count == 'd3)
+		if (count == 2'd3)
 		begin
 		  clk_14M318_ena <= 1;
-        count <= 0;
+        count <= 2'd0;
 		end
 		else
 		begin
-			count<=count+1;
+			count<=count+2'd1;
 		end
 	end
 end
@@ -131,18 +131,18 @@ reg [1:0] count2;
 always @(posedge clk)
 begin
 	if (~reset_n)
-		count2<=0;
+		count2<=2'd0;
 	else
 	begin
 		clk_28M_ena <= 0;
-		if (count2 == 'd1)
+		if (count2 == 2'd1)
 		begin
 		  clk_28M_ena <= 1;
-        count2 <= 0;
+        count2 <= 2'd0;
 		end
 		else
 		begin
-			count2<=count2+1;
+			count2<=count2+2'd1;
 		end
 	end
 end
@@ -286,12 +286,14 @@ mc6809i cpu(
   .BS(cpu_bs),
   .BA(cpu_ba),
   .nIRQ(~irq),
-  .nFIRQ(~firq & (dragon ? ~cart_firq : 1'b1)),
+//  .nFIRQ(~firq & (dragon ? ~cart_firq : 1'b1)),
+  .nFIRQ(~firq),
   .nNMI(~nmi),
   .AVMA(cpu_adv_valid_addr),
   .BUSY(cpu_busy),
   .LIC(cpu_last_inst_cycle),
-  .nHALT(dragon ? 1'b1 : ~halt),
+  //.nHALT(dragon ? 1'b1 : ~halt),
+  .nHALT(~halt),
   .nRESET(reset_n),
   .nDMABREQ(1)
 );
@@ -444,9 +446,22 @@ dragon_alt_bas64 romA_D64_2(
 
 // there must be another solution
 reg cart_loaded;
-always @(posedge clk)
-  if (load_cart & ioctl_download & ~ioctl_wr)
-    cart_loaded <= ioctl_addr > 15'h100;
+wire disk_cart_enabled_d ; // to detect disk_cart_enabled changes
+wire ioctl_download_d ; // to detect ioctl_download changes
+
+always @(posedge clk) begin
+  disk_cart_enabled_d <= disk_cart_enabled ;
+  ioctl_download_d <= ioctl_download ;  
+   if (~ioctl_download & ioctl_download_d) 
+    cart_loaded <= ioctl_addr > 15'h100;  // there is an image there if not 0
+	else if (disk_cart_enabled)
+    cart_loaded <= 1'b1;
+	else if (disk_cart_enabled_d)
+	 cart_loaded <= 1'b0; // If back to cart, empty the slot.
+end
+  
+//  if (load_cart & ioctl_download & ~ioctl_wr)
+//    cart_loaded <= ioctl_addr > 15'h100;
 //	else if (disk_cart_enabled)	// Disk Basic does not cause a interrupt.
 //    cart_loaded <= 1'b1;
 
@@ -456,7 +471,7 @@ dpram #(.addr_width_g(14), .data_width_g(8)) romC(
   .clock_a(clk),
   .address_a(cpu_addr[13:0]),
   .q_a(romC_cart_dout),
-  .enable_a(romC_cs),
+  .enable_a(romC_cs & cart_loaded),  // if no cart, no enable, so we can dismount it for real
 
   .clock_b(clk),
   .address_b(ioctl_addr[13:0]),
@@ -479,7 +494,7 @@ rom_dsk tandy_disk_rom(
   .cs(romC_cs )
  );
 
- assign romC_dout = disk_cart_enabled ? (dragon ? romC_dragondisk_dout :romC_disk_dout ) : romC_cart_dout;
+assign romC_dout = disk_cart_enabled ? (dragon ? romC_dragondisk_dout :romC_disk_dout ) : romC_cart_dout;
 
 
 wire [2:0] s_device_select;
@@ -656,7 +671,8 @@ pia6520 pia1(
   .DDRB(DDRB),
   .ca1_in(dragon64?1'b1:1'b0), // from dragon64 schematic - this should be held high
   .ca2_in(),
-  .cb1_in(cart_loaded & reset_n & clk_Q), // cartridge inserted
+//  .cb1_in(cart_loaded & reset_n & clk_Q), // cartridge inserted
+  .cb1_in(disk_cart_enabled & dragon ? cart_firq : cart_loaded & reset_n & clk_Q), // cartridge inserted 
   .cb2_in(),
   .ca2_out(cas_relay),
   .cb2_out(snden),
@@ -770,7 +786,7 @@ reg [15:0] dac_joya1;
 reg [15:0] dac_joya2;
 
 //	Limits for joysticks - set to total limits 0,255 SRH 6/5/24
-always @(clk) begin
+always @(negedge clk) begin
 
 	if (joy_use_dpad)
 	  begin
@@ -845,18 +861,22 @@ wire    FF40_read;
 wire    wd1793_data_read;
 wire    wd1793_read;
 wire    wd1793_write;
+wire	  dragon_addr3, dragon_addr2; 		
 
-assign     ff40_write = (WR_CK_ENA && io_cs && ({cpu_rw, cpu_addr[3:0]} == 5'b00000));
+assign 	dragon_addr2 = dragon_addr3 && ~(dragon && cpu_addr[2]) ; 
+assign 	dragon_addr3 = dragon ^ cpu_addr[3] ;
+assign   ff40_write = (WR_CK_ENA && io_cs && ({cpu_rw, dragon_addr3, cpu_addr[2:0]} == 5'b00000));
 
-assign    FF40_read =            ({io_cs, cpu_addr[3:0]} == 5'h10);
-assign    wd1793_data_read =    (io_cs && cpu_addr[3]);
+assign   FF40_read =            ({io_cs, dragon_addr3, cpu_addr[2:0]} == 5'h10);
+assign   wd1793_data_read =    (io_cs && dragon_addr2);
 
-assign    wd1793_read =        (cpu_rw && io_cs && cpu_addr[3] & (clk_E || clk_Q));
-assign    wd1793_write =        (~cpu_rw && io_cs && cpu_addr[3] && WR_CK_ENA);
+assign   wd1793_read =        (cpu_rw && io_cs && dragon_addr2 && (clk_E || clk_Q));
+assign   wd1793_write =        (~cpu_rw && io_cs && dragon_addr2 && WR_CK_ENA);
 
 fdc coco_fdc(
     .CLK(clk),                     // clock
 //    .CLK(CLK50MHZ),                     // clock
+	 .dragon(dragon),
     .RESET_N(reset_n),                       // async reset
     .ADDRESS(cpu_addr[1:0]),               // i/o port addr for wd1793 & FF48+
     .DATA_IN(cpu_dout),                    // data in

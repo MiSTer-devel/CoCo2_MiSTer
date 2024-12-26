@@ -52,9 +52,10 @@
 module fdc(
 	input        		CLK,     		// clock
 	input        		RESET_N,	   	// async reset
+	input					dragon,			// Coco or Dragon ?
 	input  		[1:0]	ADDRESS,       	// i/o port addr [extended for coco]
 	input  		[7:0]	DATA_IN,        // data in
-	output 		[7:0] 	DATA_HDD,      	// data out
+	output 		[7:0] DATA_HDD,      	// data out
 	output       		HALT,         	// DMA request
 	output       		NMI_09,
 	output       		FIRQ,
@@ -121,8 +122,8 @@ end
 
 localparam SDC_MAGIC_CMD = 			4'd0;
 
-wire	[7:0]	FF40_READ_VALUE = {HALT_EN, DRIVE_SEL_EXT[3], DENSITY, WRT_PREC, MOTOR,	DRIVE_SEL_EXT[2:0]};
-wire			SDC_EN = (FF40_READ_VALUE == SDC_MAGIC_CMD);
+wire	[7:0]	FF40_READ_VALUE = dragon ? 8'h00 : {HALT_EN, DRIVE_SEL_EXT[3], DENSITY, WRT_PREC, MOTOR,	DRIVE_SEL_EXT[2:0]};
+wire			SDC_EN = dragon ? 1'b0 : (FF40_READ_VALUE == SDC_MAGIC_CMD) ;
 wire	[7:0]	SDC_READ_DATA;
 
 assign SDC_READ_DATA = 8'h00;  // To be deleted.
@@ -153,40 +154,47 @@ begin
 		MOTOR <= 1'b0;
 		WRT_PREC <= 1'b0;
 		DENSITY <= 1'b0;
-		drive_index <= 3'd0;
-	end
-	else
+		drive_index <= 3'b000; 
+	end else
 	begin
 		if (FF40_ENA)
 		begin
-			DRIVE_SEL_EXT <= 	{4'b0000,
-								DATA_IN[6],		// Drive Select [3] / Side Select
-								DATA_IN[2:0]};	// Drive Select [2:0]
-			MOTOR <= DATA_IN[3];				// Turn on motor, not used here just checked, 0=MotorOff 1=MotorOn
-			WRT_PREC <= DATA_IN[4];				// Write Precompensation, not used here
-			DENSITY <= DATA_IN[5];				// Density, not used here just checked
-			case(DRIVE_SEL_EXT_PRE)
-			4'b1000:
-				drive_index <= 3'd3;
+			if (dragon) 
+			begin
+				drive_index <= { ~DATA_IN[2], DATA_IN[1:0] } ; //bit2='0 means no drive selected and no motor 
+				MOTOR <= DATA_IN[2];
+				DRIVE_SEL_EXT <= DATA_IN ; // only for DRIVE_SEL_EXT[3] for double-density 
+				DENSITY <= DATA_IN[5] ;
+			end else begin
+				DRIVE_SEL_EXT <= 	{4'b0000,
+									DATA_IN[6],		// Drive Select [3] / Side Select
+									DATA_IN[2:0]};	// Drive Select [2:0]
+				MOTOR <= DATA_IN[3];				// Turn on motor, not used here just checked, 0=MotorOff 1=MotorOn
+				WRT_PREC <= DATA_IN[4];				// Write Precompensation, not used here
+				DENSITY <= DATA_IN[5];				// Density, not used here just checked
+				case(DRIVE_SEL_EXT_PRE)
+				4'b1000:
+					drive_index <= 3'd3;
 
-			4'b0100:
-				drive_index <= 3'd2;
-		
-			4'b0010:
-				drive_index <= 3'd1;
+				4'b0100:
+					drive_index <= 3'd2;
 			
-			4'b0001:
-				drive_index <= 3'd0;
-			
-			4'b1100:
-				drive_index <= 3'd2;
-			
-			4'b1010:
-				drive_index <= 3'd1;
-			
-			4'b1001:
-				drive_index <= 3'd0;
-			endcase
+				4'b0010:
+					drive_index <= 3'd1;
+				
+				4'b0001:
+					drive_index <= 3'd0;
+				
+				4'b1100:
+					drive_index <= 3'd2;
+				
+				4'b1010:
+					drive_index <= 3'd1;
+				
+				4'b1001:
+					drive_index <= 3'd0;
+				endcase
+			end
 		end
 	end
 end
@@ -364,7 +372,7 @@ assign	selected_DRQ	=	(drive_index == 3'd0)	?	DRQ[0]:
 							(drive_index == 3'd1)	?	DRQ[1]:
 							(drive_index == 3'd2)	?	DRQ[2]:
 							(drive_index == 3'd3)	?	DRQ[3]:
-														1'b1;
+														1'b0;
 
 assign	HALT	=	HALT_EN & ~selected_DRQ;
 
@@ -387,6 +395,8 @@ reg       drive_wp[4];
 reg       [3:0] drive_ready  = 4'B0;
 reg       [3:0] double_sided = 4'B0;
 
+wire [3:0] img_mounted_d ;
+
 // As drives are mounted in MISTer this logic saves the write protect and generates ready for
 // changing drives to the wd1793.
 // This can also get the disk size to properly handle DS drives - TBD
@@ -395,38 +405,51 @@ reg       [3:0] double_sided = 4'B0;
 
 // Drive 0
 
-always @(negedge img_mounted[0])
+always @(negedge CLK)
 begin
-	drive_wp[0] <= img_readonly;
-	drive_ready[0] <= 1'b1;
-	double_sided[0]<= img_size > 20'd368600;//20'd368640;
+   img_mounted_d[0] <= img_mounted[0] ;
+	if (img_mounted[0] & ~img_mounted_d[0]) begin
+		drive_wp[0] <= img_readonly;
+		drive_ready[0] = (img_size!=20'd0) ; 
+		// drive_ready[0] <= 1'b1;
+		double_sided[0]<= img_size > 20'd368600;//20'd368640;
+	end
 end
 
 // Drive 1
 
-always @(negedge img_mounted[1])
+always @(negedge CLK)
 begin
-	drive_wp[1] <= img_readonly;
-	drive_ready[1] <= 1'b1;
-	double_sided[1]<= img_size > 20'd368600;//20'd368640;
+   img_mounted_d[1] <= img_mounted[1] ;
+	if (img_mounted[1] & ~img_mounted_d[1]) begin
+		drive_wp[1] <= img_readonly;
+		drive_ready[1] = (img_size!=20'd0) ; 
+		double_sided[1]<= img_size > 20'd368600;//20'd368640;
+	end
 end
 
 // Drive 2
 
-always @(negedge img_mounted[2])
+always @(negedge CLK)
 begin
-	drive_wp[2] <= img_readonly;
-	drive_ready[2] <= 1'b1;
-	double_sided[2]<= img_size > 20'd368600;//20'd368640;
+   img_mounted_d[2] <= img_mounted[2] ;
+	if (img_mounted[2] & ~img_mounted_d[2]) begin
+		drive_wp[2] <= img_readonly;
+		drive_ready[2] = (img_size!=20'd0) ; 
+		double_sided[2]<= img_size > 20'd368600;//20'd368640;
+	end
 end
 
 // Drive 3
 
-always @(negedge img_mounted[3])
+always @(negedge CLK)
 begin
-	drive_wp[3] <= img_readonly;
-	drive_ready[3] <= 1'b1;
-	//double_sided[3]<= img_size > 20'd368600;//20'd368640;
+   img_mounted_d[3] <= img_mounted[3] ;
+	if (img_mounted[3] & ~img_mounted_d[3]) begin
+		drive_wp[3] <= img_readonly;
+		drive_ready[3] = (img_size!=20'd0) ; 
+		//double_sided[3]<= img_size > 20'd368600;//20'd368640;
+	end
 end
 
 

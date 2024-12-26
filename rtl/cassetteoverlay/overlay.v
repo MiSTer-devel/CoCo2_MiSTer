@@ -28,8 +28,8 @@ module overlay #(
 );
 
 
-wire [9:0] new_h = hcnt - 'd150;
-wire [9:0] new_v = vcnt - 'd100;
+wire [9:0] new_h = hcnt - 10'd150;
+wire [9:0] new_v = vcnt - 10'd100;
 
 
 wire		charmap_a;

@@ -53,15 +53,15 @@ architecture SYN of mc6883 is
 	constant mode_rows    : DivisorArrayType(0 to 7) := (12-1, 3-1, 3-1, 2-1, 2-1, 1-1, 1-1, 1-1);
 	
   -- clocks
-	signal clk_7M15909		: std_logic;
-	signal clk_3M579545   : std_logic;
-	signal clk_1M769772   : std_logic;
-	signal clk_0M894866   : std_logic;
+--	signal clk_7M15909		: std_logic;
+--	signal clk_3M579545   : std_logic;
+--	signal clk_1M769772   : std_logic;
+--	signal clk_0M894866   : std_logic;
 
   -- some rising_edge pulses
 	signal rising_edge_hs : std_logic;
-	signal rising_edge_q  : std_logic;
-	signal rising_edge_e  : std_logic;
+--	signal rising_edge_q  : std_logic;
+--	signal rising_edge_e  : std_logic;
 
   -- internal versions of pin signals
 	signal we_n_s         : std_logic;
@@ -179,10 +179,10 @@ Tm:	process (clk, reset)
 	  WR_CK_ENA <= '0';
       if spd_ena = '1' then
         we_n_s <= '1';  -- default
-        clk_7M15909 <= count(0);
-        clk_3M579545 <= count(1);
-        clk_1M769772 <= count(2);
-        clk_0M894866 <= count(3);
+        -- clk_7M15909 <= count(0);
+        -- clk_3M579545 <= count(1);
+        -- clk_1M769772 <= count(2);
+        -- clk_0M894866 <= count(3);
 --        vclk <= not clk_3M579545;
         case count is
           when "0000" =>
@@ -269,16 +269,16 @@ Tm:	process (clk, reset)
   -- rising edge pulses
   process (clk, reset)
     variable old_hs : std_logic;
-    variable old_q  : std_logic;
-    variable old_e  : std_logic;
+  --  variable old_q  : std_logic;
+  --  variable old_e  : std_logic;
   begin
     if reset = '1' then
       old_hs := '0';
       rising_edge_hs <= '0';
-      old_q := '0';
-      rising_edge_q <= '0';
-      old_e := '0';
-      rising_edge_e <= '0';
+   --   old_q := '0';
+      -- rising_edge_q <= '0';
+   --   old_e := '0';
+      -- rising_edge_e <= '0';
     elsif rising_edge (clk) then
       if spd_ena = '1' then
 --      if clk_ena = '1' then
