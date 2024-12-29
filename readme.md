@@ -15,15 +15,14 @@ This core implements a Tandy Color Computer 2 (CoCo2) including:
  * Cassette Loading
  * Sound
  * Cartridge Support
- * Disk support
 
 ### Dragon 32 / 64
 
+ * only the dragon 32 seems to work 
  * 2 Analog Joysticks (with a swap feature)
  * Cassette Loading
  * Sound
  * Cartridge Support
- * Disk support : with this release, .VDK disks need to be converted to .DSK 
 
 
 ![Coco2 running on the AX309](photo.jpg)

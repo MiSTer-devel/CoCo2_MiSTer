@@ -4,7 +4,8 @@
 module dragoncoco(
   input clk, // 57.272727 mhz
   input turbo,
-  input reset_n, // todo: reset_n doesn't work!
+  input trig_reset_n, // todo: reset_n doesn't work!  // done. CPU needs reset low for 2 full cpu cycles (that's 128 clk cycles) with the clocks running.
+							 // which means that reset of SAM needs to Be released far before the cpu reset_n goes inactive
   input hard_reset,
   input dragon,
   input dragon64,
@@ -50,7 +51,7 @@ module dragoncoco(
   input [15:0] ioctl_addr,
   input ioctl_download,
   input ioctl_wr,
-  input ioctl_index,
+  input [15:0] ioctl_index,
 
 
   // cassette signals
@@ -94,59 +95,31 @@ module dragoncoco(
 
 );
 
+
+shortint reset_counter ;
+wire reset_n, l_reset ;
+
+assign l_reset = ~trig_reset_n || hard_reset || (disk_cart_enabled ^ disk_cart_enabled_d );
+
+always @(posedge clk or posedge l_reset)
+begin
+	if (l_reset)
+	begin
+		reset_counter <= 256 ;  // minimum 1 cycle at low speed = 64 clk
+		reset_n <= 1'b0 ;
+	end 
+	else begin 
+			if (reset_counter != 0) reset_counter<=reset_counter-1 ; else reset_n <= 1'b1 ;
+	end
+end
+
 assign clk_Q_out = clk_Q;
+wire clk_enable ;
 
 wire nmi; 
 wire halt; 
 
 wire clk_E, clk_Q;
-
-
-reg clk_14M318_ena ;
-reg [1:0] count;
-
-
-always @(posedge clk)
-begin
-	if (~reset_n)
-		count<=2'd0;
-	else
-	begin
-		clk_14M318_ena <= 0;
-		if (count == 2'd3)
-		begin
-		  clk_14M318_ena <= 1;
-        count <= 2'd0;
-		end
-		else
-		begin
-			count<=count+2'd1;
-		end
-	end
-end
-
-reg clk_28M_ena ;
-reg [1:0] count2;
-
-always @(posedge clk)
-begin
-	if (~reset_n)
-		count2<=2'd0;
-	else
-	begin
-		clk_28M_ena <= 0;
-		if (count2 == 2'd1)
-		begin
-		  clk_28M_ena <= 1;
-        count2 <= 2'd0;
-		end
-		else
-		begin
-			count2<=count2+2'd1;
-		end
-	end
-end
-wire clk_enable = turbo ? clk_28M_ena : clk_14M318_ena;
 
 
 wire [7:0] cpu_dout;
@@ -160,8 +133,6 @@ wire cpu_last_inst_cycle;
 wire irq;
 wire firq;
 wire cart_firq;
-
-
 
 wire ram_cs,rom8_cs,romA_cs,romC_cs,io_cs,pia1_cs,pia_cs,pia_orig_cs;
 
@@ -193,18 +164,10 @@ wire [7:0] kb_cols, kb_rows;
 wire [7:0] pia1_portb_out;
 
 // data mux
-/*
-wire [7:0] cpu_din =
-  ram_cs  ? ram_dout  :
-  rom8_cs ? rom8_dout :
-  romA_cs ? romA_dout :
-  romC_cs ? romC_dout :
-  pia_cs  ? pia_dout  :
-  pia1_cs ? pia1_dout :
-  io_cs   ? io_out : 8'hff;
-*/
+
 wire [7:0] cpu_din;
 
+// always @(posedge clk)
 always_comb begin
    unique case (1'b1)
      ram_cs:  cpu_din =  ram_dout;
@@ -219,21 +182,6 @@ always_comb begin
 	
 end
 
-/*
-always @(posedge clk)
-begin
-   unique case (1'b1)
-     ram_cs:  cpu_din =  ram_dout;
-     rom8_cs: cpu_din =  rom8_dout2;
-     romA_cs: cpu_din =  romA_dout2;
-     romC_cs: cpu_din =  romC_dout2;
-     pia_cs:  cpu_din =  pia_dout2;
-     pia1_cs: cpu_din =  pia1_dout2;
-     io_cs:   cpu_din =  io_out;
-     default: cpu_din =  8'hff;
-   endcase
-end
-*/
 
 /*
 Dragon 64 has two hardware changes to access more I/O
@@ -286,7 +234,6 @@ mc6809i cpu(
   .BS(cpu_bs),
   .BA(cpu_ba),
   .nIRQ(~irq),
-//  .nFIRQ(~firq & (dragon ? ~cart_firq : 1'b1)),
   .nFIRQ(~firq),
   .nNMI(~nmi),
   .AVMA(cpu_adv_valid_addr),
@@ -297,40 +244,6 @@ mc6809i cpu(
   .nRESET(reset_n),
   .nDMABREQ(1)
 );
-
-
-// CPU section copyrighted by John Kent
-//reg clk_e_enable;
-//reg e_r;
-//always @(negedge clk)
-//begin
-//    e_r<=clk_E;
-//    clk_e_enable<=0;
-//    if (clk_E==0 && e_r ==1) 
-//		clk_e_enable<=1;
-//end
-//cpu09 GLBCPU09(
-	//.clk(clk_E),
-	//.ce(1'b1),
-//	.clk(clk),
-//	.ce(clk_e_enable),
-//	.rst(~reset_n),
-//	.vma(cpu_adv_valid_addr),
-//	.lic_out(cpu_last_inst_cycle),
-//	.addr(cpu_addr),
-//	.bs(cpu_bs),
-//	.ba(cpu_ba),
-//	.rw(cpu_rw),
-//	.data_in(dragon64?cpu_din64:cpu_din),
-//	.data_out(cpu_dout),
-	//.halt( dragon ? 1'b0 : halt),
-//	.halt( halt),
-//	.hold(1'b0),
-//	.irq(irq),
-	//.firq(firq| cart_firq ),
-//	.firq(firq ),
-//	.nmi(nmi)
-//);
 
 
 
@@ -452,7 +365,7 @@ wire ioctl_download_d ; // to detect ioctl_download changes
 always @(posedge clk) begin
   disk_cart_enabled_d <= disk_cart_enabled ;
   ioctl_download_d <= ioctl_download ;  
-   if (~ioctl_download & ioctl_download_d) 
+   if (~ioctl_download & ioctl_download_d & load_cart) 
     cart_loaded <= ioctl_addr > 15'h100;  // there is an image there if not 0
 	else if (disk_cart_enabled)
     cart_loaded <= 1'b1;
@@ -465,7 +378,7 @@ end
 //	else if (disk_cart_enabled)	// Disk Basic does not cause a interrupt.
 //    cart_loaded <= 1'b1;
 
-wire load_cart = ioctl_index == 1;
+wire load_cart = ioctl_index[5:0] == 1;
 
 dpram #(.addr_width_g(14), .data_width_g(8)) romC(
   .clock_a(clk),
@@ -517,9 +430,9 @@ begin
 		cas_n_r<=0;
 		q_r<=0;
 	end
-	else if  (clk_enable == 1)
+	else if  (clk_enable == 1)  
 	begin
-	     if (ras_n == 1 && ras_n_r == 0  && clk_E ==1)
+	     if (ras_n == 1 && ras_n_r == 0  && clk_E == 1 )
 		  begin
 		    //  ram_datao <= sram_i.d(ram_datao'range);
 			ram_dout<=vdg_data;
@@ -552,13 +465,20 @@ begin
 end
 			//assign ram_dout=vdg_data;
 
+			// SAM is now generating the clocks E & Q 
+			// the signal clk_enable used to pace the clock at the correct speed has to be extracted from SAM
+			
 wire	WR_CK_ENA;
 wire 	VClk;
 
+
+
 mc6883 sam(
 			.clk(clk),
-			.clk_ena(clk_enable),
-			.reset(~reset_n),
+			// .clk_ena(WR_CK_ENA),		// not used anymore, SAM is pacing the clock by itself
+			.spd_ena(clk_enable),
+			.turbo(turbo),          // user request speed change, SAM has to do the choices
+			.reset(~trig_reset_n),
 
 			//-- input
 			.addr(cpu_addr),
@@ -681,7 +601,28 @@ pia6520 pia1(
   .reset(~reset_n)
 );
 
+// These are the two debug lines.
+wire [7:0] dbg1_b1 ;
+wire [7:0] dbg1_b2 ;
+wire [7:0] dbg2_b1 ;
+wire [7:0] dbg2_b2 ;
+wire [7:0] dbg3_b1 ;
 
+always @(posedge clk)
+begin
+   if (~reset_n) begin
+	   dbg1_b1<=8'd0 ;
+	   dbg1_b2<=8'd0 ;
+	   dbg2_b1<=8'd0 ;
+	   dbg2_b2<=8'd0 ;
+	 //  dbg3_b1<=8'd0 ;
+	end
+   if (cpu_addr==16'hffff && cpu_rw && clk_E) begin dbg1_b1 <= cpu_din ; end
+   if (cpu_addr==16'hfffe && cpu_rw && clk_E) begin dbg2_b1 <= cpu_din ; end
+	if (cpu_rw && clk_E && dbg1_b1 != 8'd0 && dbg2_b1=='0) begin dbg1_b2 <= cpu_addr[15:8]; dbg2_b2 <= cpu_addr[7:0]; dbg2_b1<=8'b1 ; end
+   // if (cpu_addr==16'hb4b3 && cpu_rw && clk_E) begin dbg3_b1 <= cpu_din ; end
+	dbg3_b1 <= { 7'd0, reset_n } ;
+end 
 
 assign DLine1 = {
 
@@ -705,7 +646,7 @@ assign DLine1 = {
 // the disk controller
 assign DLine2 = {
 
-5'b10000,						// space
+//5'b10000,						// space
 5'b11111,						// '#'  (to mark the data)
 1'b0,pia1_portb_out[7:4],
 5'b10000,						// space
@@ -718,14 +659,27 @@ assign DLine2 = {
 3'b0,ram_dout_b[7:6],
 5'b10000,						// space
 
-{22{5'b10000}}
+1'b0,dbg1_b2[3:0],
+1'b0,dbg1_b2[7:4],
+1'b0,dbg2_b2[3:0],
+1'b0,dbg2_b2[7:4],
+5'b10000,						// space
+1'b0,dbg1_b1[3:0],
+1'b0,dbg1_b1[7:4],
+1'b0,dbg2_b1[3:0],
+1'b0,dbg2_b1[7:4],
+5'b10000,						// space
+1'b0,dbg3_b1[3:0],
+1'b0,dbg3_b1[7:4],
+
+{11{5'b10000}}
 };
 
 mc6847pace vdg(
   .clk(clk),
 //  .clk_ena(clk_enable),//VClk - vclk doesn't seem to work
   .clk_ena(VClk),//VClk - vclk doesn't seem to work
-  .reset(~reset_n),
+  .reset(~trig_reset_n),
   .da0(da0),
   .dd(ram_dout_b),
   .hs_n(hs_n),

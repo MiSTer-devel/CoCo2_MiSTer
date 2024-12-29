@@ -34,6 +34,4 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/fdc.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/wd1793.sv
 set_global_assignment -name VHDL_FILE rtl/OVO.vhd
 set_global_assignment -name QIP_FILE rtl/cassetteoverlay/cassetteoverlay.qip
-
-
 set_global_assignment -name SYSTEMVERILOG_FILE CoCo2.sv
