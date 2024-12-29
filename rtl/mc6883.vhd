@@ -7,7 +7,9 @@ entity mc6883 is
 	port
 	(
 		clk			: in std_logic;
-		clk_ena 		: in std_logic;
+		-- clk_ena 		: in std_logic;
+		spd_ena		: buffer std_logic;
+		turbo			: in std_logic;
 		reset			: in std_logic;
 		
 		-- input
@@ -72,6 +74,7 @@ architecture SYN of mc6883 is
 	-- control register (CR)
 	signal cr				: std_logic_vector(15 downto 0);
 	signal sel_cr		: std_logic;
+	signal turbo_d		: std_logic ;
 	
 	alias ty_memory_map_type: std_logic 							is cr(15);
 	alias m_memory_size		: std_logic_vector(1 downto 0) 	is cr(14 downto 13);
@@ -100,7 +103,7 @@ architecture SYN of mc6883 is
 	constant FAST				: std_logic := '1';
 	constant SLOW				: std_logic := '0';
 
-	signal	spd_ena			: std_logic;
+	-- signal	spd_ena			: std_logic;
 	signal	fast_slow		: std_logic;
 	signal	spd_fast_n_slow	: std_logic;
 
@@ -409,8 +412,13 @@ Tm:	process (clk, reset)
 	begin
 		if reset = '1' then
 			cr <= (others => '0');
-		elsif falling_edge (clk) then
-          if spd_ena = '1' then
+			turbo_d <='0' ;
+		elsif falling_edge (clk) then  
+			turbo_d <= turbo ;
+			if (turbo /= turbo_d) then 
+				r_mpu_rate(0) <= turbo ;
+			end if;
+         if spd_ena = '1' then
 --			if clk_ena = '1' then
 			if sel_cr = '1' and we_n_s = '0' then
 				case addr(4 downto 1) is

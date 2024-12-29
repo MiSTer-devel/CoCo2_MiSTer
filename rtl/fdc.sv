@@ -122,7 +122,7 @@ end
 
 localparam SDC_MAGIC_CMD = 			4'd0;
 
-wire	[7:0]	FF40_READ_VALUE = dragon ? 8'h00 : {HALT_EN, DRIVE_SEL_EXT[3], DENSITY, WRT_PREC, MOTOR,	DRIVE_SEL_EXT[2:0]};
+wire	[7:0]	FF40_READ_VALUE =  {HALT_EN, DRIVE_SEL_EXT[3], DENSITY, WRT_PREC, MOTOR,	DRIVE_SEL_EXT[2:0]};
 wire			SDC_EN = dragon ? 1'b0 : (FF40_READ_VALUE == SDC_MAGIC_CMD) ;
 wire	[7:0]	SDC_READ_DATA;
 
@@ -362,7 +362,7 @@ assign	selected_INTRQ	=	(drive_index == 3'd0)	?	INTRQ[0]:
 							(drive_index == 3'd3)	?	INTRQ[3]:
 														1'b0;
 
-assign	NMI_09	=	DENSITY & selected_INTRQ;				// Send NMI if Double Density (Halt Mode)
+assign	NMI_09	=  DENSITY & selected_INTRQ;				// DENSITY is just the IRQ mask : Send NMI if allowed (Halt Mode)
 
 //	HALT from disk controller
 //	Selected DRQ
