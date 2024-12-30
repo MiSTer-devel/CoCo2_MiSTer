@@ -101,11 +101,16 @@ wire			HALT_EN;
 // Diagnostics only
 assign probe = {2'd0, HALT_EN_RST, sd_buff_wr, WR[0], RD[0], HALT_EN, HALT};
 
-// Generate a 8.333 Mhz enable for the fdc... and control writes
-wire ena_8Mhz;
+// Generate a 8.333 Mhz enable for the fdc... and control writes 
+// Dragon needs a 1.5 Mhz clock
+
+wire ena_8Mhz ; 
+wire [6:0] fdc_clk_dvd ;
 wire [5:0]	div_8mhz;
 
-assign ena_8Mhz = (div_8mhz == 6'd6) ? 1'b1: 1'b0;
+// yet another poorly documented difference between Dragon and CoCo2 : clock of the disk controller is 8Mhz for Coco and 1.5Mhz for Dragon
+assign fdc_clk_dvd = (dragon ) ? 6'd38 : 6'd6 ;
+assign ena_8Mhz = (div_8mhz == fdc_clk_dvd) ? 1'b1: 1'b0;
 //assign ena_8Mhz = (div_8mhz == 6'd5) ? 1'b1: 1'b0;
 
 always@(negedge CLK or negedge RESET_N)
