@@ -524,7 +524,7 @@ end
 dragoncoco dragoncoco(
   .clk(clk_sys), // 50 mhz
   .turbo(status[7]),
-  .reset_n(~reset),
+  .trig_reset_n(~reset),
   .hard_reset(hard_reset),
   .dragon(dragon),
   .dragon64(dragon64),
