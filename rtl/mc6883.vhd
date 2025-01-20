@@ -18,6 +18,7 @@ entity mc6883 is
 
 		-- vdg signals
 		da0			: in std_logic;  -- display address 0 - 
+		vh2			: in std_logic;
 		hs_n			: in std_logic;
 		vclk			: out std_logic;
 		
@@ -106,6 +107,7 @@ architecture SYN of mc6883 is
 	-- signal	spd_ena			: std_logic;
 	signal	fast_slow		: std_logic;
 	signal	spd_fast_n_slow	: std_logic;
+	signal  vclk_d        : std_logic ;
 
 	alias spd_fast			: std_logic is clk_28M_ena;
 	alias spd_slow			: std_logic is clk_14M318_ena;
@@ -127,16 +129,24 @@ Tm:	process (clk, reset)
 			t_clks <= (others => '0');
 			clk_28M_ena <= '0';
 			clk_14M318_ena <= '0';
+			vclk_d <= '0' ;
+			vclk <= '0' ;
 		elsif rising_edge (clk) then
 			clk_28M_ena <= '0';
 			clk_14M318_ena <= '0';
+			vclk_d <= '0' ;
+			vclk <= '0' ;
 			if t_clks(0) = '1' then -- this is divide by 2
 				clk_28M_ena <= '1';
 			end if;
 			if t_clks = "11" then	-- this is divide by 4
 				clk_14M318_ena <= '1';
+				vclk_d <= '1' ;
+				vclk <= '1' ;
 			end if;
 			t_clks <= t_clks + '1';
+--			vclk_d <= clk_14M318_ena ; 
+--			vclk <= vclk_d ;
 		end if;
 	end process;
 
@@ -161,15 +171,15 @@ Tm:	process (clk, reset)
   -- - until tDHW (short) after falling edge E
   --
 
-  vclk <= spd_ena;
+--  vclk <= spd_ena;
 
   -- clock generation, ras/cas generation
   PROC_MAIN : process (clk, reset, rw_n)
-    variable count : std_logic_vector(3 downto 0);
+    variable count : std_logic_vector(4 downto 0);
   begin
     if reset = '1' then
       --count := (others => '0');
-		count := "0000";
+		count := "00000";
 		z_ram_addr <= (others => '0');
 		clk_q <= '0';
 		clk_e <= '0';
@@ -187,14 +197,14 @@ Tm:	process (clk, reset)
         -- clk_1M769772 <= count(2);
         -- clk_0M894866 <= count(3);
 --        vclk <= not clk_3M579545;
-        case count is
+        case count(3 downto 0) is
           when "0000" =>
             -- valid VDG address (row)
             -- z_ram_addr(7) is RAS1# or B(7)
             z_ram_addr <= b_int(7 downto 0);
             ras0_n <= '0';
           when "0001" =>
-          when "0010" =>
+			 when "0010" =>
             -- valid VDG address (col)
             --case m_memory_size is
             --  when "00" =>
@@ -202,11 +212,10 @@ Tm:	process (clk, reset)
             --  when "01" =>
             --    z_ram_addr <= '0' & b_int(13 downto 7);
             --  when others =>
-                z_ram_addr <= b_int(15 downto 8);
+            z_ram_addr <= b_int(15 downto 8);
             --end case;
             cas_n <= '0';
-			
-			fast_slow <= spd_fast_n_slow;
+				if (count(4) = '0') then fast_slow <= spd_fast_n_slow; end if;
           when "0011" =>
             clk_q <= '1';
           when "0100" =>
@@ -261,13 +270,15 @@ Tm:	process (clk, reset)
           when others =>
             null;
         end case;
-        count := count + 1;
+		
+		  count := count + 1;
      end if; -- clk_ena
     end if;
   end process PROC_MAIN;
 
   -- assign outputs
   we_n <= we_n_s;
+
 		
   -- rising edge pulses
   process (clk, reset)
@@ -283,7 +294,8 @@ Tm:	process (clk, reset)
    --   old_e := '0';
       -- rising_edge_e <= '0';
     elsif rising_edge (clk) then
-      if spd_ena = '1' then
+--f      if spd_ena = '1' then
+		if (vclk_d = '1') then
 --      if clk_ena = '1' then
         rising_edge_hs <= '0';
         if old_hs = '0' and hs_n = '1' then
@@ -311,7 +323,8 @@ Tm:	process (clk, reset)
       yscale := 0;
       saved_b := (others => '0');
     elsif rising_edge (clk) then
-      if spd_ena = '1' then
+  --f    if spd_ena = '1' then
+		if (vclk_d = '1') then
 --      if clk_ena = '1' then
         -- vertical blanking - HS rises when DA0 is high
         -- resets bits B9-15, clear B1-B8
@@ -326,7 +339,7 @@ Tm:	process (clk, reset)
           if v_vdg_addr_modes(0) = '0' then
             b_int(4) <= '0';
           end if;
-          b_int(3 downto 1) <= (others => '0');
+          b_int(3 downto 1) <= (others => '0');   
           -- coming out of HS?
           if old_hs = '1' then
             if yscale = mode_rows(conv_integer(v_vdg_addr_modes(2 downto 0))) then
