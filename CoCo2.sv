@@ -179,6 +179,7 @@ module emu
 
 //assign ADC_BUS  = 'Z;
 assign USER_OUT = '1;
+
 assign {UART_RTS, UART_TXD, UART_DTR} = 0;
 assign {SD_SCK, SD_MOSI, SD_CS} = 'Z;
 assign {SDRAM_DQ, SDRAM_A, SDRAM_BA, SDRAM_CLK, SDRAM_CKE, SDRAM_DQML, SDRAM_DQMH, SDRAM_nWE, SDRAM_nCAS, SDRAM_nRAS, SDRAM_nCS} = 'Z;
@@ -209,10 +210,10 @@ assign BUTTONS = 0;
 //////////////////////////////////////////////////////////////////
 
 
-wire [1:0] ar = status[20:19];
+wire ar = status[19];
 
-assign VIDEO_ARX = (!ar) ? 12'd4 : (ar - 1'd1);
-assign VIDEO_ARY = (!ar) ? 12'd3 : 12'd0;
+assign VIDEO_ARX = (!ar) ? 13'd4 : 13'd16;
+assign VIDEO_ARY = (!ar) ? 13'd3 : 13'd9;
 
 
 `include "build_id.v"
@@ -239,7 +240,7 @@ localparam CONF_STR = {
 	"P1-;",
 	"P1-, -= Video Settings =-;",
 	"P1-;",
-	"P1OJK,Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
+	"P1OJ,Aspect ratio,Original,Full Screen;",
 	"P1OFH,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;", 
 	"P1O4,Overscan,Hidden,Visible;",
 	"P1O3,Artifact,Enable,Disable;",
@@ -538,6 +539,7 @@ dragoncoco dragoncoco(
   .hsync(HSync),
   .vsync(VSync),
   .vclk(vclk),
+  // .sam_a01(sam_a01),
   // input ps2_clk,
   // input ps2_dat,
   .uart_din(1'b0),
@@ -680,8 +682,18 @@ wire       scandoubler = (scale || forced_scandoubler);
 assign VGA_SL = sl[1:0];
 
 wire freeze_sync;
+wire [3:0] sam_a01;
 
+// debug on USER port (I use a physical oscilloscope and data analyzer)
+//assign USER_OUT[0] = sam_a01[1] ;//hblank
+//assign USER_OUT[1] = HSync ;
+//assign USER_OUT[2] = sam_a01[3]; //hs_n
+//assign USER_OUT[3] = '0;
+//assign USER_OUT[4] = sam_a01[0]; //sam_a[0]
+//assign USER_OUT[5] = sam_a01[2]; //da0
+//assign USER_OUT[6] = VSync;
 
+// assign USER_OUT[6:2]='1 ;
 
 video_mixer #(.LINE_LENGTH(380), .GAMMA(1)) video_mixer
 (
@@ -711,8 +723,8 @@ video_mixer #(.LINE_LENGTH(380), .GAMMA(1)) video_mixer
 	wire [7:0]bb = o_b;
 `endif
 
-reg  [26:0] act_cnt;
-always @(posedge clk_sys) act_cnt <= act_cnt + 1'd1;
+// reg  [26:0] act_cnt;
+// always @(posedge clk_sys) act_cnt <= act_cnt + 1'd1;
 
 assign LED_USER    = 1'b0;
 
