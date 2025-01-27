@@ -76,23 +76,24 @@ module dragoncoco(
   input				CLK50MHZ,
 
   // SD block level interface
-  input   [3:0]  		img_mounted, // signaling that new image has been mounted
+  input   [4:0]  		img_mounted, // signaling that new image has been mounted
   input				img_readonly, // mounted as read only. valid only for active bit in img_mounted
   input 	[19:0] 		img_size,    // size of image in bytes. 1MB MAX!
 
-  output	[31:0] 		sd_lba[4],
-  output  [5:0] 		sd_blk_cnt[4], // number of blocks-1, total size ((sd_blk_cnt+1)*(1<<(BLKSZ+7))) must be <= 16384!
+  output	[31:0] 		sd_lba[5],
+  output  [5:0] 		sd_blk_cnt[5], // number of blocks-1, total size ((sd_blk_cnt+1)*(1<<(BLKSZ+7))) must be <= 16384!
 
-  output 	reg  [3:0]	sd_rd,
-  output 	reg  [3:0]	sd_wr,
-  input        [3:0]	sd_ack,
+  output 	reg  [4:0]	sd_rd,
+  output 	reg  [4:0]	sd_wr,
+  input        [4:0]	sd_ack,
 
   // SD byte level access. Signals for 2-PORT altsyncram.
   input  	[8:0] 		sd_buff_addr,
   input  	[7:0] 		sd_buff_dout,
-  output 	[7:0] 		sd_buff_din[4],
-  input        		sd_buff_wr
+  output 	[7:0] 		sd_buff_din[5],
+  input        			sd_buff_wr,
 
+  input					CASS_REWIND_RECORD
 );
 
 
@@ -367,17 +368,10 @@ always @(posedge clk) begin
   ioctl_download_d <= ioctl_download ;  
    if (~ioctl_download & ioctl_download_d & load_cart) 
     cart_loaded <= ioctl_addr > 15'h100;  // there is an image there if not 0
-	else if (disk_cart_enabled)
-    cart_loaded <= 1'b1;
-	else if (disk_cart_enabled_d)
-	 cart_loaded <= 1'b0; // If back to cart, empty the slot.
+   else if (disk_cart_enabled)
+    cart_loaded <= 1'b0; //SRH 1/26/25 no FIRQ on disk
 end
   
-//  if (load_cart & ioctl_download & ~ioctl_wr)
-//    cart_loaded <= ioctl_addr > 15'h100;
-//	else if (disk_cart_enabled)	// Disk Basic does not cause a interrupt.
-//    cart_loaded <= 1'b1;
-
 wire load_cart = ioctl_index[5:0] == 1;
 
 dpram #(.addr_width_g(14), .data_width_g(8)) romC(
@@ -852,20 +846,20 @@ fdc coco_fdc(
 
 
     //     SD block level interface
-    .img_mounted(img_mounted),         // signaling that new image has been mounted
+    .img_mounted(img_mounted[3:0]),         // signaling that new image has been mounted
     .img_readonly(img_readonly),         // mounted as read only. valid only for active bit in img_mounted
     .img_size(img_size),                // size of image in bytes. 1MB MAX!
 
-    .sd_lba(sd_lba),
-    .sd_blk_cnt(sd_blk_cnt),             // number of blocks-1, total size ((sd_blk_cnt+1)*(1<<(BLKSZ+7))) must be <= 16384!
-    .sd_rd(sd_rd),
-    .sd_wr(sd_wr),
-    .sd_ack(sd_ack),
+    .sd_lba(sd_lba[0:3]),
+    .sd_blk_cnt(sd_blk_cnt[0:3]),             // number of blocks-1, total size ((sd_blk_cnt+1)*(1<<(BLKSZ+7))) must be <= 16384!
+    .sd_rd(sd_rd[3:0]),
+    .sd_wr(sd_wr[3:0]),
+    .sd_ack(sd_ack[3:0]),
 
     //     SD byte level access. Signals for 2-PORT altsyncram.
     .sd_buff_addr(sd_buff_addr),
     .sd_buff_dout(sd_buff_dout),
-    .sd_buff_din(sd_buff_din),
+    .sd_buff_din(sd_buff_din[0:3]),
     .sd_buff_wr(sd_buff_wr),
 
     .probe(fdc_probe)
@@ -873,4 +867,56 @@ fdc coco_fdc(
 
 
 wire	[7:0]	fdc_probe;
+
+// Start of Cassette Save
+// Generate 1.78 Mhz [enable] GP clk
+reg clk_1_78;
+reg [4:0] clk_178_ctr;
+
+always @ (negedge clk or negedge reset_n)
+begin
+	if(!reset_n)
+	begin
+		clk_1_78 <= 1'b0;
+		clk_178_ctr <= 5'b00000;
+	end
+	else
+	begin
+		clk_1_78 <= 1'b0;
+		clk_178_ctr <= clk_178_ctr + 1'b1;
+		if (clk_178_ctr == 5'd27)
+		begin
+			clk_1_78 <= 1'b1;
+		end
+	end
+end
+
+Cassette_Write CoCo3_Cassette_Write(
+		.RESET_N(reset_n),
+		.CLK(clk),
+		.CLK_1_78(clk_1_78),
+
+		.CASS_REWIND_RECORD(CASS_REWIND_RECORD),
+		.MOTOR_ON(cas_relay),
+		.DTOA_CODE(dac_data),
+		
+// 		SD block level interface
+		.img_mounted(img_mounted[4]), 	// signaling that new image has been mounted
+		.img_readonly(img_readonly),	// mounted as read only. valid only for active bit in img_mounted
+		.img_size(img_size),    		// size of image in bytes. 
+
+		.sd_lba(sd_lba[4]),
+		.sd_blk_cnt(sd_blk_cnt[4]), 	// number of blocks-1, total size ((sd_blk_cnt+1)*(1<<(BLKSZ+7))) must be <= 16384!
+		.sd_rd(sd_rd[4]),
+		.sd_wr(sd_wr[4]),
+		.sd_ack(sd_ack[4]),
+
+// 		SD byte level access. Signals for 2-PORT altsyncram.
+		.sd_buff_addr(sd_buff_addr),
+		.sd_buff_dout(sd_buff_dout),
+		.sd_buff_din(sd_buff_din[4]),
+		.sd_buff_wr(sd_buff_wr)
+);
+
+
 endmodule

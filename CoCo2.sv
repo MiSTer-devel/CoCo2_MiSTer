@@ -231,10 +231,16 @@ localparam CONF_STR = {
 	"H2S3,DSK,Load Disk Drive 3;",
 	"-;",
 	"OC,Tape Input,File,ADC;",
+    "-;",
 	"H0F2,CAS,Load Cassette;",
-	"H0TF,Stop & Rewind;",
+	"H0TR,Stop & Rewind;",
+    "-;",
+    "H0S4,CAS,Save Cassette;",
+    "H0OS,Cass Rwd=0 / Rec=1,0,1;",
+    "-;",
+
 	"OD,Monitor Tape Sound,No,Yes;",
-   "OG,Show Tape Status,Yes,No;",
+	"OQ,Show Tape Status,Yes,No;",
 	"-;",
 	"P1,Video Settings;",
 	"P1-;",
@@ -284,21 +290,21 @@ wire  [7:0] ioctl_data;
 wire  [7:0] ioctl_index;
 
 // SD block level interface
-wire	[3:0]  	img_mounted;
+wire	[4:0]  	img_mounted;
 wire				img_readonly;
 wire	[19:0] 	img_size;
 
-wire	[31:0] 	sd_lba[4];
-wire	[5:0] 	sd_blk_cnt[4];
+wire	[31:0] 	sd_lba[5];
+wire	[5:0] 	sd_blk_cnt[5];
 
-wire	[3:0]		sd_rd;
-wire	[3:0]		sd_wr;
-wire	[3:0]		sd_ack;
+wire	[4:0]		sd_rd;
+wire	[4:0]		sd_wr;
+wire	[4:0]		sd_ack;
 
 // SD byte level access. Signals for 2-PORT altsyncram.
 wire  [8:0] 	sd_buff_addr;
 wire  [7:0] 	sd_buff_dout;
-wire  [7:0] 	sd_buff_din[4];
+wire  [7:0] 	sd_buff_din[5];
 wire        	sd_buff_wr;
 
 
@@ -308,7 +314,7 @@ wire [15:0] joya1, joya2;
 wire [21:0] gamma_bus;
 
 
-hps_io #(.CONF_STR(CONF_STR),.VDNUM(4),.BLKSZ(2)) hps_io
+hps_io #(.CONF_STR(CONF_STR),.VDNUM(5),.BLKSZ(2)) hps_io
 (
 	.clk_sys(clk_sys),
 	.HPS_BUS(HPS_BUS),
@@ -457,8 +463,9 @@ wire [31:0] coco_joy2 = status[10] ? joy1 : joy2;
 wire [15:0] coco_ajoy1 = status[10] ? {center_joystick_x2[7:0],center_joystick_y2[7:0]} : {center_joystick_x1[7:0],center_joystick_y1[7:0]};
 wire [15:0] coco_ajoy2 = status[10] ? {center_joystick_x1[7:0],center_joystick_y1[7:0]} : {center_joystick_x2[7:0],center_joystick_y2[7:0]};
 
-wire show_cas_overlay = ~status[16];
+wire show_cas_overlay = ~status[26];
 
+wire CASS_REWIND_RECORD = status[28];
 
 wire casdout;
 wire cas_relay;
@@ -470,9 +477,10 @@ reg hard_reset_r;
 reg machine_select_reset;
 reg [3:0]reset_count;
 reg [1:0] hard_reset_state = 2'b00;
-reg disk_cart_enabled;
+reg disk_cart_enabled, disk_cart_enabled_r;
 //wire disk_cart_enabled = status[14] & status[9:8]==2'b00;
 reg hard_reset;
+
 
 always @(posedge clk_sys)
 begin
@@ -480,18 +488,28 @@ begin
  dragon64 <= (status[9:8]==2'b10);
  dragon   <= (status[9:8]!=2'b00);
  disk_cart_enabled <= (status[14]);
+ disk_cart_enabled_r <= disk_cart_enabled;
 
  if (hard_reset_r!=status[23])
  begin
 	reset_count<=4'b1111;
-        hard_reset_state = 2'b01;
+    hard_reset_state = 2'b01;
  end
 
  if (machineselect_r!=status[9:8])
  begin
 	reset_count<=4'b1111;
-        //hard_reset_state = 2'b01; // for now don't force hard reset when
-	//switching systems
+	hard_reset_state = 2'b01; // for now don't force hard reset when
+							  //switching systems
+							  // SRH 1/26/25 Added back in to reset whenever system changes [dragon, dragon32, coco2]
+ end
+
+ if (disk_cart_enabled_r!=disk_cart_enabled)
+ begin
+	reset_count<=4'b1111;
+	hard_reset_state = 2'b01; // for now don't force hard reset when
+							  //switching systems
+							  // SRH 1/26/25 Added back in to reset whenever system changes [disk / cart]
  end
  case (hard_reset_state)
 	2'b00: 
@@ -596,9 +614,9 @@ dragoncoco dragoncoco(
   .sd_buff_dout(sd_buff_dout),
   .sd_buff_din(sd_buff_din),
   .sd_buff_wr(sd_buff_wr),
-  .CLK50MHZ(CLK_50M)
+  .CLK50MHZ(CLK_50M),
 
-
+  .CASS_REWIND_RECORD(CASS_REWIND_RECORD)
 
 );
 
@@ -633,7 +651,7 @@ cassette cassette(
   .clk(clk_sys),
   .Q(clk_Q_out),
 
-  .rewind(status[15]| (load_tape&ioctl_download)),
+  .rewind(status[27]| (load_tape&ioctl_download)),
   .en(cas_relay),
 
   .sdram_addr(sdram_addr),

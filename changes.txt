@@ -9,12 +9,14 @@ CoCo2_20240701 - 008
 6:  Preliminary double speed poke in the SAM via SAM registers coded.  WIP
 7:  FDC changed to use system clk and divide to 8 Mhz changed to /6.  FIRQ generation
     for Dragon, qualified enabled only in Dragon configurations.
+8:	Fixed some incorrect menu subscript duplications
+9:	Added Cassette Save
 
 Issues:
-1:  Highspeed pokes may be backwards.  Full 1.78Mhz seems to have a video issue.
+1:  Highspeed pokes do not work
 
 
 To Do...
-2:    Add Cassette Save
-4:    Get FDC working for dragon (edited)
+1:    Add Cassette Save
+2:    Get FDC working for dragon (edited)
 
