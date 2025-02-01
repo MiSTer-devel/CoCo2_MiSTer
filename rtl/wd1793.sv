@@ -501,7 +501,8 @@ always @(posedge clk_sys) begin
 								wdreg_sector <= wdreg_sector + 1'b1;
 								state <= STATE_SEARCH;
 							end else begin
-								state <= STATE_ENDCOMMAND;
+//								state <= STATE_ENDCOMMAND; 1/30/25 SRH & jF Fix too early interrupt for dragon
+								state <= STATE_WAIT;
 							end
 						end else begin
 							byte_addr <= byte_addr + 1'd1;

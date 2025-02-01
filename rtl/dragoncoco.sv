@@ -809,7 +809,10 @@ wire    FF40_read;
 wire    wd1793_data_read;
 wire    wd1793_read;
 wire    wd1793_write;
-wire	  dragon_addr3, dragon_addr2; 		
+wire	dragon_addr3, dragon_addr2; 		
+wire	fdc_halt;
+
+assign	halt = dragon ? 1'b0 : fdc_halt;
 
 assign 	dragon_addr2 = dragon_addr3 && ~(dragon && cpu_addr[2]) ; 
 assign 	dragon_addr3 = dragon ^ cpu_addr[3] ;
@@ -823,13 +826,12 @@ assign   wd1793_write =        (~cpu_rw && io_cs && dragon_addr2 && WR_CK_ENA);
 
 fdc coco_fdc(
     .CLK(clk),                     // clock
-//    .CLK(CLK50MHZ),                     // clock
 	 .dragon(dragon),
     .RESET_N(reset_n),                       // async reset
     .ADDRESS(cpu_addr[1:0]),               // i/o port addr for wd1793 & FF48+
     .DATA_IN(cpu_dout),                    // data in
     .DATA_HDD(io_out),                  // data out
-    .HALT(halt),                         // DMA request
+    .HALT(fdc_halt),                       // DMA request [dragon is no halt]
     .NMI_09(nmi),
     .FIRQ(cart_firq),
     .DS_ENABLE(1'b0),                    // DS support - '1 to enable drives 0-2

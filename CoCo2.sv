@@ -17,7 +17,7 @@
 //============================================================================
 
 // Enable overlay (or not)
-`define USE_OVERLAY
+//`define USE_OVERLAY
 
 module emu
 (
@@ -258,7 +258,7 @@ localparam CONF_STR = {
 	"OA,Swap Joysticks,Off,On;",
 	"-;",
 	"O89,Machine,CoCo2,Dragon32,Dragon64;",
-	"O7,Turbo,Off,On;",
+//	"O7,Turbo,Off,On;",			// Code left in place for menu based activation / deactivation
 	"-;",
 `ifdef USE_OVERLAY
 	"OB,Debug display,Off,On;",
