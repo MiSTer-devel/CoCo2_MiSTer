@@ -60,7 +60,6 @@ module fdc(
 	output       		NMI_09,
 	output       		FIRQ,
 
-	input				DS_ENABLE,		// Turn on DS support
 
 	input				FF40_CLK,		// FDC Write support
 	input				FF40_ENA,
@@ -87,9 +86,8 @@ module fdc(
 	input  		[8:0]	sd_buff_addr,
 	input  		[7:0] 	sd_buff_dout,
 	output 		[7:0] 	sd_buff_din[4],
-	input        		sd_buff_wr,
+	input        		sd_buff_wr
 	
-	output		[7:0]	probe
 );
 
 wire	[7:0]	DRIVE_SEL_EXT;
@@ -98,8 +96,6 @@ wire			WRT_PREC;
 wire			DENSITY;
 wire			HALT_EN;
 
-// Diagnostics only
-assign probe = {2'd0, HALT_EN_RST, sd_buff_wr, WR[0], RD[0], HALT_EN, HALT};
 
 // Generate a 8.333 Mhz enable for the fdc... and control writes 
 // Dragon needs a 1.5 Mhz clock
@@ -111,7 +107,6 @@ wire [5:0]	div_8mhz;
 // yet another poorly documented difference between Dragon and CoCo2 : clock of the disk controller is 8Mhz for Coco and 1.5Mhz for Dragon
 assign fdc_clk_dvd = (dragon ) ? 6'd38 : 6'd6 ;
 assign ena_8Mhz = (div_8mhz == fdc_clk_dvd) ? 1'b1: 1'b0;
-//assign ena_8Mhz = (div_8mhz == 6'd5) ? 1'b1: 1'b0;
 
 always@(negedge CLK or negedge RESET_N)
 begin
@@ -125,17 +120,11 @@ begin
 		end
 end
 
-localparam SDC_MAGIC_CMD = 			4'd0;
 
 wire	[7:0]	FF40_READ_VALUE =  {HALT_EN, DRIVE_SEL_EXT[3], DENSITY, WRT_PREC, MOTOR,	DRIVE_SEL_EXT[2:0]};
-wire			SDC_EN = dragon ? 1'b0 : (FF40_READ_VALUE == SDC_MAGIC_CMD) ;
-wire	[7:0]	SDC_READ_DATA;
-
-assign SDC_READ_DATA = 8'h00;  // To be deleted.
 
 //FDC read data path.  =$ff40 or wd1793(s)
-assign	DATA_HDD =		(SDC_EN)							?	SDC_READ_DATA:
-						(FF40_RD)							?	FF40_READ_VALUE:
+assign	DATA_HDD =		(FF40_RD)							?	FF40_READ_VALUE:
 						(WD1793_RD)							?	DATA_1793: //(1793[s])
 																8'h00;
 
@@ -197,6 +186,9 @@ begin
 					drive_index <= 3'd1;
 				
 				4'b1001:
+					drive_index <= 3'd0;
+
+				default:
 					drive_index <= 3'd0;
 				endcase
 			end

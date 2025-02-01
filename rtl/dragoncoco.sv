@@ -834,7 +834,6 @@ fdc coco_fdc(
     .HALT(fdc_halt),                       // DMA request [dragon is no halt]
     .NMI_09(nmi),
     .FIRQ(cart_firq),
-    .DS_ENABLE(1'b0),                    // DS support - '1 to enable drives 0-2
 
 //    FDC host r/w handling
     .FF40_CLK(ff40_write),
@@ -862,13 +861,11 @@ fdc coco_fdc(
     .sd_buff_addr(sd_buff_addr),
     .sd_buff_dout(sd_buff_dout),
     .sd_buff_din(sd_buff_din[0:3]),
-    .sd_buff_wr(sd_buff_wr),
+    .sd_buff_wr(sd_buff_wr)
 
-    .probe(fdc_probe)
 );
 
 
-wire	[7:0]	fdc_probe;
 
 // Start of Cassette Save
 // Generate 1.78 Mhz [enable] GP clk
