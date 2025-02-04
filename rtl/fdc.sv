@@ -407,7 +407,7 @@ begin
    img_mounted_d[0] <= img_mounted[0] ;
 	if (img_mounted[0] & ~img_mounted_d[0]) begin
 		drive_wp[0] <= img_readonly;
-		drive_ready[0] = (img_size!=20'd0) ; 
+		drive_ready[0] <= (img_size!=20'd0) ; 
 		// drive_ready[0] <= 1'b1;
 		double_sided[0]<= img_size > 20'd368600;//20'd368640;
 	end
@@ -420,7 +420,7 @@ begin
    img_mounted_d[1] <= img_mounted[1] ;
 	if (img_mounted[1] & ~img_mounted_d[1]) begin
 		drive_wp[1] <= img_readonly;
-		drive_ready[1] = (img_size!=20'd0) ; 
+		drive_ready[1] <= (img_size!=20'd0) ; 
 		double_sided[1]<= img_size > 20'd368600;//20'd368640;
 	end
 end
@@ -432,7 +432,7 @@ begin
    img_mounted_d[2] <= img_mounted[2] ;
 	if (img_mounted[2] & ~img_mounted_d[2]) begin
 		drive_wp[2] <= img_readonly;
-		drive_ready[2] = (img_size!=20'd0) ; 
+		drive_ready[2] <= (img_size!=20'd0) ; 
 		double_sided[2]<= img_size > 20'd368600;//20'd368640;
 	end
 end
@@ -444,8 +444,8 @@ begin
    img_mounted_d[3] <= img_mounted[3] ;
 	if (img_mounted[3] & ~img_mounted_d[3]) begin
 		drive_wp[3] <= img_readonly;
-		drive_ready[3] = (img_size!=20'd0) ; 
-		//double_sided[3]<= img_size > 20'd368600;//20'd368640;
+		drive_ready[3] <= (img_size!=20'd0) ; 
+		double_sided[3]<= img_size > 20'd368600;//20'd368640;
 	end
 end
 
@@ -463,6 +463,7 @@ wd1793 #(1,1) coco_wd1793_0
 	.dout(dout[0]),
 	.drq(DRQ[0]),
 	.intrq(INTRQ[0]),
+	.dragon(dragon),
 
 	.img_mounted(img_mounted[0]),
 	.img_size(img_size),
@@ -481,8 +482,8 @@ wd1793 #(1,1) coco_wd1793_0
 
 	.size_code(3'd5),		// 5 is 18 sector x 256 bits COCO standard
 	.layout(~double_sided[0]),	// 0 = Track-Side-Sector, 1 - Side-Track-Sector
-	.side(double_sided[0] & DRIVE_SEL_EXT[3]),
-	.ready(drive_ready[0]),
+	.coco_side(double_sided[0] & DRIVE_SEL_EXT[3]), // CoCo specific floppy side signal
+ 	.ready(drive_ready[0]),
 
 	.input_active(0),
 	.input_addr(0),
@@ -504,6 +505,7 @@ wd1793 #(1,0) coco_wd1793_1
 	.dout(dout[1]),
 	.drq(DRQ[1]),
 	.intrq(INTRQ[1]),
+	.dragon(dragon),
 
 	.img_mounted(img_mounted[1]),
 	.img_size(img_size),
@@ -522,7 +524,7 @@ wd1793 #(1,0) coco_wd1793_1
 
 	.size_code(3'd5),		// 5 is 18 sector x 256 bits COCO standard
 	.layout(~double_sided[1]),	// 0 = Track-Side-Sector, 1 - Side-Track-Sector
-	.side(double_sided[1] & DRIVE_SEL_EXT[3]),
+	.coco_side(double_sided[1] & DRIVE_SEL_EXT[3]), // CoCo specific floppy side signal
 	.ready(drive_ready[1]),
 
 	.input_active(0),
@@ -545,6 +547,7 @@ wd1793 #(1,0) coco_wd1793_2
 	.dout(dout[2]),
 	.drq(DRQ[2]),
 	.intrq(INTRQ[2]),
+	.dragon(dragon),
 
 	.img_mounted(img_mounted[2]),
 	.img_size(img_size),
@@ -563,7 +566,7 @@ wd1793 #(1,0) coco_wd1793_2
 
 	.size_code(3'd5),		// 5 is 18 sector x 256 bits COCO standard
 	.layout(~double_sided[2]),	// 0 = Track-Side-Sector, 1 - Side-Track-Sector
-	.side(double_sided[2] & DRIVE_SEL_EXT[3]),
+	.coco_side(double_sided[2] & DRIVE_SEL_EXT[3]), // CoCo specific floppy side signal
 	.ready(drive_ready[2]),
 
 	.input_active(0),
@@ -586,6 +589,7 @@ wd1793 #(1,0) coco_wd1793_3
 	.dout(dout[3]),
 	.drq(DRQ[3]),
 	.intrq(INTRQ[3]),
+	.dragon(dragon),
 
 	.img_mounted(img_mounted[3]),
 	.img_size(img_size),
@@ -603,8 +607,8 @@ wd1793 #(1,0) coco_wd1793_3
 	.wp(drive_wp[3]),
 
 	.size_code(3'd5),		// 5 is 18 sector x 256 bits COCO standard
-	.layout(1'b1),			// 0 = Track-Side-Sector, 1 - Side-Track-Sector
-	.side(1'b0),			// DS can not be supported for drive 3.
+	.layout((dragon) ? ~double_sided[3] : 1'b1),			// 0 = Track-Side-Sector, 1 - Side-Track-Sector
+	.coco_side(1'b0),			// CoCo only : DS can not be supported for drive 3.
 	.ready(drive_ready[3]),
 
 	.input_active(0),
