@@ -155,7 +155,8 @@ begin
 		begin
 			if (dragon) 
 			begin
-				drive_index <= { ~DATA_IN[2], DATA_IN[1:0] } ; //bit2='0 means no drive selected and no motor 
+//				drive_index <= { ~DATA_IN[2], DATA_IN[1:0] } ; //bit2='0 means no drive selected and no motor 
+				drive_index <= { 1'b0, DATA_IN[1:0] } ; // SRH & jF removed motor from causing selects to be out of range 
 				MOTOR <= DATA_IN[2];
 				DRIVE_SEL_EXT <= DATA_IN ; // only for DRIVE_SEL_EXT[3] for double-density 
 				DENSITY <= DATA_IN[5] ;

@@ -725,7 +725,7 @@ always @(posedge clk_sys) begin
 									data_length <= 6;
 
 									read_addr[0] <= disk_track;
-									read_addr[1] <= {7'b0, side};
+									read_addr[1] <= {7'b0, dragon ? din[1] : side}; // jF DS support for Dragon [2797]
 									read_addr[2] <= ra_sector;
 									read_addr[3] <= wd_size_code;
 									read_addr[4] <= 0;
@@ -747,6 +747,7 @@ always @(posedge clk_sys) begin
 									{s_wrfault,s_seekerr,s_crcerr,s_lostdata} <= 0;
 									s_drq_busy <= 2'b01;
 									state <= STATE_WAIT;
+									dragon_side <= din[1] ;  // jF DS support for Dragon [2797]
 								end
 							'hE:	// READ TRACK
 								begin
@@ -754,6 +755,7 @@ always @(posedge clk_sys) begin
 									s_seekerr  <= 1;
 									s_drq_busy <= 2'b01;
 									state <= STATE_WAIT;
+									dragon_side <= din[1] ;  // jF DS support for Dragon [2797]
 								end
 							endcase
 						end
