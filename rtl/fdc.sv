@@ -300,16 +300,24 @@ begin
 		begin
 //			Set Writes
 			r_w_active <= 1'b1;
-			case (drive_index)
-				3'd0:
-					WR[0] <= 1'b1;
-				3'd1:
-					WR[1] <= 1'b1;
-				3'd2:
-					WR[2] <= 1'b1;
-				3'd3:
-					WR[3] <= 1'b1;
-			endcase
+			if (ADDRESS[1:0]==2'b00)
+				case (drive_index)
+					3'd0:
+						WR[0] <= 1'b1;
+					3'd1:
+						WR[1] <= 1'b1;
+					3'd2:
+						WR[2] <= 1'b1;
+					3'd3:
+						WR[3] <= 1'b1;
+				endcase 
+			else 
+			begin // FLYNN : if not a command, write the register in ALL fdc components.
+				WR[0] <= 1'b1;
+				WR[1] <= 1'b1;
+				WR[2] <= 1'b1;
+				WR[3] <= 1'b1;
+			end
 		end
 
 //		Synchronus rising edge of read

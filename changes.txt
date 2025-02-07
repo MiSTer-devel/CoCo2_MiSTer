@@ -1,4 +1,4 @@
-CoCo2_20250205 - 002 RC4
+CoCo2_20250207 - 001 RC5
 1:	Recursion testing spreadsheet completed.
 2:	Updated MiSTer template
 3:	Added Daily Build Number.  Note sys/build_num.tcl changed to add this functionality.
@@ -13,8 +13,8 @@ CoCo2_20250205 - 002 RC4
 9:	Added Cassette Save
 10: Added minor delay to 1793 interrupt to fix dragon os9 problem.  Also removed HALT from
     dragon FDC.
-11: Nitro OS9 working on CoCo, loading on Dragon64.  Known issues with multi-drive dragon Nitro systems. WIP.
+11: Nitro OS9 working on CoCo & Dragon64.
 
 To Do...
-1:  Fix Dragon multi-drive NitrOS9 issues
+
 
