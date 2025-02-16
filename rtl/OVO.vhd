@@ -74,10 +74,14 @@ ARCHITECTURE rtl OF ovo IS
     x"18", x"0C", x"06", x"06", x"06", x"0C", x"18", x"00",  -- (  18
     x"06", x"0C", x"18", x"18", x"18", x"0C", x"06", x"00",  -- )  19
     x"00", x"0C", x"0C", x"00", x"00", x"0C", x"0C", x"00",  -- :  1A
-    x"00", x"00", x"00", x"00", x"00", x"0C", x"0C", x"00",  -- .  1B
-    x"00", x"00", x"00", x"00", x"00", x"0C", x"0C", x"06",  -- ,  1C
-    x"1E", x"33", x"30", x"18", x"0C", x"00", x"0C", x"00",  -- ?  1D
-    x"18", x"18", x"18", x"00", x"18", x"18", x"18", x"00",  -- |  1E
+--    x"00", x"00", x"00", x"00", x"00", x"0C", x"0C", x"00",  -- .  1B
+--    x"00", x"00", x"00", x"00", x"00", x"0C", x"0C", x"06",  -- ,  1C
+--    x"1E", x"33", x"30", x"18", x"0C", x"00", x"0C", x"00",  -- ?  1D
+--    x"18", x"18", x"18", x"00", x"18", x"18", x"18", x"00",  -- |  1E
+	 x"41", x"43", x"45", x"49", x"51", x"61", x"41", x"00",   -- N  1B 
+	 x"3E", x"41", x"41", x"41", x"41", x"41", x"3E", x"00",   -- O  1C
+	 x"3F", x"41", x"41", x"3F", x"11", x"21", x"41", x"00",   -- R  1D
+	 x"41", x"63", x"55", x"49", x"41", x"41", x"41", x"00",   -- M  1E
     x"36", x"36", x"7F", x"36", x"7F", x"36", x"36", x"00"); -- #  1F
   SIGNAL vcpt,hcpt,hcpt2 : natural RANGE 0 TO 4095;
   SIGNAL vin0,vin1 : unsigned(0 TO COLS*5-1);
@@ -117,7 +121,7 @@ BEGIN
         ----------------------------------
         -- Latch sampled values during vertical sync
 --      IF i_vs='1' THEN
-        IF (i_Hcount="000000000" and i_VCount="00000000000")  THEN
+        IF (i_Hcount="000000000" and i_VCount="000000000")  THEN
           vin0<=in0s;
           vin1<=in1s;
         END IF;
@@ -129,11 +133,11 @@ BEGIN
 --        ELSIF i_hs='1' AND t_hs='0' AND de='1' THEN
 --          vcpt<=(vcpt+1) MOD 4096;
 --        END IF;
---		  if (i_Hcount < 16) then
---		      hcpt <= 256;
---		  else
-				hcpt <= to_integer(i_Hcount);
---		  end if;
+		  if (i_Hcount < 148) then  -- 148 = video left border
+		      hcpt <= COLS*8;
+		  else
+				hcpt <= to_integer(i_Hcount)-148;
+		  end if;
 		  if (i_Vcount < 16) then
 		      vcpt <= 512;
 		  else
@@ -158,9 +162,9 @@ BEGIN
         ----------------------------------
         -- Pick characters
         IF hcpt<COLS * 8 AND vcpt<LINES * 8 THEN
-			 -- need to reverse string so 0-4 is left (not right!)
-          -- char_v:=vin_v((hcpt/8)*5 TO (hcpt/8)*5+4);
-          char_v:=vin_v(((COLS-1) - (hcpt/8))*5 TO ((COLS-1) - (hcpt/8))*5+4);
+			 -- no=> need to reverse string so 0-4 is left (not right!)
+          char_v:=vin_v((hcpt/8)*5 TO (hcpt/8)*5+4);
+          -- char_v:=vin_v(((COLS-1) - (hcpt/8))*5 TO ((COLS-1) - (hcpt/8))*5+4);
         ELSE
           char_v:="10000"; -- " " : Blank character
         END IF;
@@ -171,9 +175,9 @@ BEGIN
         -- Insert Overlay
         IF ena='1' THEN
           IF col(hcpt2 MOD 8)='1' THEN
-            o_r<=rgb(23 DOWNTO 16);
-            o_g<=rgb(15 DOWNTO  8);
-            o_b<=rgb( 7 DOWNTO  0);
+            o_r<=RGB(23 DOWNTO 16);
+            o_g<=RGB(15 DOWNTO  8);
+            o_b<=RGB( 7 DOWNTO  0);
           END IF;
         END IF;
       --END IF;

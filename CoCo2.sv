@@ -17,7 +17,7 @@
 //============================================================================
 
 // Enable overlay (or not)
-//`define USE_OVERLAY
+`define USE_OVERLAY
 
 module emu
 (
@@ -568,6 +568,9 @@ dragoncoco dragoncoco(
   .ioctl_download(ioctl_download),
   .ioctl_index(ioctl_index),
   .ioctl_wr(ioctl_wr),
+  .roms_loaded(roms_found),
+  .roms_reset(RESET),
+  
   .casdout(status[12] ? adc_cassette_bit : casdout),
   .cas_relay(cas_relay),
   .artifact_phase(status[2]),
@@ -732,17 +735,14 @@ video_mixer #(.LINE_LENGTH(380), .GAMMA(1)) video_mixer
 
 `ifdef USE_OVERLAY
 	// mix in overlay!
-	wire [7:0]rr = o_r | {C_R,C_R};
-	wire [7:0]gg = o_g | {C_R,C_R};
-	wire [7:0]bb = o_b | {C_R,C_R};
+	wire [7:0]rr = o_r | C_R | CN_R;
+	wire [7:0]gg = o_g | C_R | CN_R;
+	wire [7:0]bb = o_b | C_R ;
 `else
-	wire [7:0]rr = o_r;
-	wire [7:0]gg = o_g;
-	wire [7:0]bb = o_b;
+	wire [7:0]rr = o_r | CN_R;
+	wire [7:0]gg = o_g | CN_R;
+	wire [7:0]bb = o_b ;
 `endif
-
-// reg  [26:0] act_cnt;
-// always @(posedge clk_sys) act_cnt <= act_cnt + 1'd1;
 
 assign LED_USER    = 1'b0;
 
@@ -752,7 +752,7 @@ reg [8:0] HCount,VCount;
 
 `ifdef USE_OVERLAY
 
-reg [3:0] C_R,C_G,C_B;
+reg [7:0] C_R,C_G,C_B;
 
 wire [159:0]DLine1;
 wire [159:0]DLine2;
@@ -760,9 +760,9 @@ wire [159:0]DLine2;
 
 ovo OVERLAY
 (
-    .i_r(4'd0),
-    .i_g(4'd0),
-    .i_b(4'd0),
+    .i_r(8'd0),
+    .i_g(8'd0),
+    .i_b(8'd0),
     .i_clk(clk_sys),
 
 	 .i_Hcount(HCount),
@@ -778,6 +778,66 @@ ovo OVERLAY
 );
 
 `endif
+
+wire [3:0] roms_found ;
+wire [159:0]NOrom1;
+wire [159:0]NOrom2;
+reg [7:0]  CN_R ;
+
+ovo #(.COLS(32), .LINES(32)) NOROMOVO
+(
+    .i_r(8'd0),
+    .i_g(8'd0),
+    .i_b(8'd0),
+    .i_clk(clk_sys),
+	 .i_Hcount(HCount),
+	 .i_VCount(VCount),
+    .o_r(CN_R),
+    .ena((dragon64 & ~roms_found[2]) | (dragon & ~dragon64 & ~roms_found[1]) | (~dragon & ~roms_found[0]) | (disk_cart_enabled & ~roms_found[3]) ),
+    .in0(NOrom1),
+    .in1(NOrom2)
+);
+
+assign NOrom2 = {
+{32{5'b10000}}
+};
+
+assign NOrom1 = {
+//{17{5'b10000}},
+5'b10000,						// space
+5'b11011,						// N
+5'b11100,						// O
+5'b10000,						// space
+5'b11101,						// R
+5'b11100,						// O
+5'b11110,						// M
+5'b10000,						// space
+5'b10011,						// -
+5'b10000,						// space
+5'b11011,						// N
+5'b11100,						// O
+5'b10000,						// space
+5'b11101,						// R
+5'b11100,						// O
+5'b11110,						// M
+5'b10000,						// space
+5'b11011,						// N
+5'b11100,						// O
+5'b10000,						// space
+5'b11101,						// R
+5'b11100,						// O
+5'b11110,						// M
+5'b10000,						// space
+5'b10011,						// -
+5'b10000,						// space
+5'b11011,						// N
+5'b11100,						// O
+5'b10000,						// space
+5'b11101,						// R
+5'b11100,						// O
+5'b11110						   // M
+};
+
 
 
 endmodule

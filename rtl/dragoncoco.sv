@@ -52,6 +52,8 @@ module dragoncoco(
   input ioctl_download,
   input ioctl_wr,
   input [15:0] ioctl_index,
+  output [3:0] roms_loaded,
+  input roms_reset,
 
 
   // cassette signals
@@ -135,7 +137,7 @@ wire irq;
 wire firq;
 wire cart_firq;
 
-wire ram_cs,rom8_cs,romA_cs,romC_cs,io_cs,pia1_cs,pia_cs,pia_orig_cs;
+wire ram_cs,rom8_cs,rom8k_cs,romA_cs,romC_cs,io_cs,pia1_cs,pia_cs,pia_orig_cs;
 
 
 wire [7:0]vdg_data;
@@ -143,8 +145,8 @@ reg [7:0] ram_dout;
 reg [7:0] ram_dout_b;
 wire [7:0] rom8_dout;
 reg [7:0] rom8_dout2;
-wire [7:0] romA_dout;
-reg [7:0] romA_dout2;
+// wire [7:0] romA_dout;
+// reg [7:0] romA_dout2;
 wire [7:0] romC_dout;
 wire [7:0] romC_cart_dout;
 wire [7:0] romC_disk_dout;
@@ -173,7 +175,7 @@ always_comb begin
    unique case (1'b1)
      ram_cs:  cpu_din =  ram_dout;
      rom8_cs: cpu_din =  rom8_dout2;
-     romA_cs: cpu_din =  romA_dout2;
+     romA_cs: cpu_din =  rom8_dout2;  // rom8 is now 16K, from 0x8000 to 0xBFFF
      romC_cs: cpu_din =  romC_dout2;
      pia_cs:  cpu_din =  pia_dout2;
      pia1_cs: cpu_din =  pia1_dout2;
@@ -202,19 +204,12 @@ wire acia_cs = cpu_addr[2] &  pia_orig_cs ;
    pulling it high, we wired the output of DDRB2 to this logic, and it seems to swap 
 	ROM banks correctly now. A bit of a hack, but it seems to work.
 */
-wire rom8_1_cs = rom8_cs & (~DDRB[2] | pia1_portb_out[2]);
-wire romA_1_cs = romA_cs & (~DDRB[2] | pia1_portb_out[2]);
-wire rom8_2_cs = rom8_cs & DDRB[2] & ~pia1_portb_out[2];
-wire romA_2_cs = romA_cs & DDRB[2] & ~pia1_portb_out[2];
 wire [7:0] cpu_din64;
 
 always_comb begin
    unique case (1'b1)
      ram_cs:     cpu_din64 =  ram_dout;
-     rom8_1_cs:  cpu_din64 =  rom8_64_1_2;
-     rom8_2_cs:  cpu_din64 =  rom8_64_2_2;
-     romA_1_cs:  cpu_din64 =  romA_64_1_2;
-     romA_2_cs:  cpu_din64 =  romA_64_2_2;
+     rom8_cs:    cpu_din64 =  rom8_64_1_2 ;
      romC_cs:    cpu_din64 =  romC_dout2;
 	  acia_cs:    cpu_din64 =  acia_dout;
      pia_cs:     cpu_din64 =  pia_dout2;
@@ -270,92 +265,89 @@ dpram #(.addr_width_g(16), .data_width_g(8)) ram1(
   .q_b(vdg_data)
 );
 
+// BOOT ROMS  - inspired from COCO3
+
+localparam     [1:0]    BOOT0 = 2'd0;
+localparam     [1:0]    BOOT1 = 2'd1;
+localparam     [1:0]    BOOT2 = 2'd2;
+localparam     [1:0]    BOOT3 = 2'd3;
+
+localparam     [5:0]    BOOT  = 6'd0;
+
+// 16KROM : CoCo ROMS 0x8000-0xBFFF ext & bas
+wire  COCO2_ROM_WR = (ioctl_index[7:0] == {BOOT0, BOOT})  & ioctl_wr;
+// 16KROM : Dragon32 ROMS 0x8000-0xBFFF ext & bas
+wire  DGN32_ROM_WR = (ioctl_index[7:0] == {BOOT1, BOOT}) & ioctl_wr;
+// 32KROM : Dragon64 16K 0x8000-0xBFFF then Dragon64_ext 16K 0x8000-0BFFF
+wire  DGN64_ROM_WR = (ioctl_index[7:0] == {BOOT2, BOOT}) & ioctl_wr;
+// 32KROM : Disk Drivers 8K CoCo2, then 8K D32, then 8K D64, then 8K unused
+wire  DISKS_ROM_WR = (ioctl_index[7:0] == {BOOT3, BOOT}) & ioctl_wr;
+
+always @(posedge clk) begin
+	if (roms_reset) roms_loaded <= 4'b0000 ;
+	if (COCO2_ROM_WR) roms_loaded[0] <= 1'b1 ;
+	if (DGN32_ROM_WR) roms_loaded[1] <= 1'b1 ;
+	if (DGN64_ROM_WR) roms_loaded[2] <= 1'b1 ;
+	if (DISKS_ROM_WR) roms_loaded[3] <= 1'b1 ;
+end
+
+dpram_1r1w #(16384, 14) roms_coco2
+(
+		.wrclock(clk),
+		.wren(COCO2_ROM_WR),
+		.wraddress(ioctl_addr[13:0]),
+		.data(ioctl_data[7:0]),
+		
+		.rdclock(clk),
+		.rdaddress(cpu_addr[13:0]),
+		.q(rom8_dout_tandy)
+);
+	
+dpram_1r1w #(16384, 14) roms_D32
+(
+		.wrclock(clk),
+		.wren(DGN32_ROM_WR),
+		.wraddress(ioctl_addr[13:0]),
+		.data(ioctl_data[7:0]),
+		
+		.rdclock(clk),
+		.rdaddress(cpu_addr[13:0]),
+		.q(rom8_dout_dragon)
+);
+
+dpram_1r1w #(32768, 15)  roms_D64
+(
+		.wrclock(clk),
+		.wren(DGN64_ROM_WR),
+		.wraddress(ioctl_addr[14:0]),
+		.data(ioctl_data[7:0]),
+		
+		.rdclock(clk),
+		.rdaddress({DDRB[2] & ~pia1_portb_out[2], cpu_addr[13:0]}),
+		.q(rom8_64_1)
+);
+
+dpram_1r1w #(24576, 15)  roms_disk   // 4th slot is unused so it's only 24K
+(
+		.wrclock(clk),
+		.wren(DISKS_ROM_WR),
+		.wraddress(ioctl_addr[14:0]),
+		.data(ioctl_data[7:0]),
+		
+		.rdclock(clk),
+		.rdaddress({dragon64, ~dragon64 & dragon, cpu_addr[12:0]}),
+		.q(romC_disk_dout)
+);
+	
+	
 // 8k extended basic rom
 // Do we need an option to enable/disable extended basic rom?
 assign rom8_dout = dragon ?   rom8_dout_dragon : rom8_dout_tandy;
 wire [7:0] rom8_dout_dragon;
 wire [7:0] rom8_dout_tandy;
 
-rom_ext rom8(
-  .clk(clk),
-  .addr(cpu_addr[12:0]),
-  .dout(rom8_dout_tandy),
-  .cs(~rom8_cs)
-);
-dragon_ext rom8_D(
-  .clk(clk),
-  .addr(cpu_addr[12:0]),
-  .dout(rom8_dout_dragon),
-  .cs(~rom8_cs)
-);
-
-
-assign romA_dout = dragon ?  romA_dout_dragon : romA_dout_tandy;
-wire [7:0] romA_dout_dragon;
-wire [7:0] romA_dout_tandy;
-
-// 8k color basic rom
-rom_bas romA(
-  .clk(clk),
-  .addr(cpu_addr[12:0]),
-  .dout(romA_dout_tandy),
-  .cs(~romA_cs)
-);
-
-dragon_bas romA_D(
-  .clk(clk),
-  .addr(cpu_addr[12:0]),
-  .dout(romA_dout_dragon),
-  .cs(~romA_cs )
- );
-
- 
- 
-
-//
-// Dragon 64 has two banks of 16k roms. We split them into 
-// 4 banks of 8. Not sure this is the best idea..
-// 
 reg [7:0] rom8_64_1_2;
-reg [7:0] rom8_64_2_2;
-reg [7:0] romA_64_1_2;
-reg [7:0] romA_64_2_2;
-
 wire [7:0] rom8_64_1;
-wire [7:0] rom8_64_2;
-wire [7:0] romA_64_1;
-wire [7:0] romA_64_2;
-
- 
-dragon_ext64 rom8_D64_1(
-  .clk(clk),
-  .addr(cpu_addr[12:0]),
-  .dout(rom8_64_1),
-  .cs(~rom8_cs)
-);
- 
-dragon_bas64 romA_D64_1(
-  .clk(clk),
-  .addr(cpu_addr[12:0]),
-  .dout(romA_64_1),
-  .cs(~romA_cs )
- );
-
-dragon_alt_ext64 rom8_D64_2(
-  .clk(clk),
-  .addr(cpu_addr[12:0]),
-  .dout(rom8_64_2),
-  .cs(~rom8_cs)
-);
- 
-dragon_alt_bas64 romA_D64_2(
-  .clk(clk),
-  .addr(cpu_addr[12:0]),
-  .dout(romA_64_2),
-  .cs(~romA_cs )
- );
- 
- 
 
 
 // there must be another solution
@@ -386,27 +378,11 @@ dpram #(.addr_width_g(14), .data_width_g(8)) romC(
   .wren_b(ioctl_wr & load_cart)
 );
 
-/*dragon_dsk*/
-dratrs dragon_disk_rom(
-  .clk(clk),
-  .addr(cpu_addr[12:0]),
-  .dout(romC_dragondisk_dout),
-  .cs(romC_cs )
- );
 
-rom_dsk tandy_disk_rom(
-  .clk(clk),
-  .addr(cpu_addr[12:0]),
-  .dout(romC_disk_dout),
-  .cs(romC_cs )
- );
-
-assign romC_dout = disk_cart_enabled ? (dragon ? romC_dragondisk_dout :romC_disk_dout ) : romC_cart_dout;
-
+//assign romC_dout = disk_cart_enabled ? (dragon ? romC_dragondisk_dout :romC_disk_dout ) : romC_cart_dout;
+assign romC_dout = disk_cart_enabled ? romC_disk_dout : romC_cart_dout;
 
 wire [2:0] s_device_select;
-
-
 
 wire da0;
 wire [7:0] ma_ram_addr;
@@ -431,14 +407,10 @@ begin
 		    //  ram_datao <= sram_i.d(ram_datao'range);
 			ram_dout<=vdg_data;
 			romC_dout2<=romC_dout;
-			romA_dout2<=romA_dout;
 			rom8_dout2<=rom8_dout;
 			pia_dout2<=pia_dout;
 			pia1_dout2<=pia1_dout;
 			rom8_64_1_2<=rom8_64_1;
-			rom8_64_2_2<=rom8_64_2;
-			romA_64_1_2<=romA_64_1;
-			romA_64_2_2<=romA_64_2;
 
         end
         if (ras_n == 0 && ras_n_r == 1)
@@ -518,9 +490,12 @@ wire nc;
 wire [7:0] cs74138;
 assign {
   nc,io_cs, pia1_cs, pia_orig_cs,
-  romC_cs, romA_cs, rom8_cs,
+  romC_cs, romA_cs, rom8k_cs,
   ram_cs
 } = cs74138;
+
+assign rom8_cs = romA_cs | rom8k_cs ; // to not disturb the 74138 stuff : it's nice to see images of physical original components in here
+												  // nevertheless, the external ROM doesn't need this rom8/romA separation.
 
 ttl_74ls138_p u11(
 .a(s_device_select[0]),
@@ -619,8 +594,6 @@ begin
 end 
 
 assign DLine1 = {
-
-5'b10000,						// space
 5'b11111,						// '#'  (to mark the data)
 4'b0000, cas_relay,
 5'b10000,						// space
@@ -633,7 +606,7 @@ assign DLine1 = {
 3'b0,ram_dout_b[7:6],
 5'b10000,						// space
 
-{22{5'b10000}}
+{23{5'b10000}}
 };
 
 // two is a copy of 1 for now, but we will use this for debugging
@@ -665,8 +638,10 @@ assign DLine2 = {
 5'b10000,						// space
 1'b0,dbg3_b1[3:0],
 1'b0,dbg3_b1[7:4],
+5'b10000,						// space
+1'b0,roms_loaded,
 
-{11{5'b10000}}
+{9{5'b10000}}
 };
 
 mc6847pace vdg(
