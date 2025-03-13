@@ -152,7 +152,7 @@ architecture SYN of mc6847pace is
   -- character rom signals
   signal char_a               : std_logic_vector(10 downto 0);
   signal char_d_o             : std_logic_vector(7 downto 0);
-	signal cvbs_linebuf_we_r    : std_logic;
+	signal cvbs_linebuf_we_r    : std_logic;----
 	signal cvbs_linebuf_addr_r  : std_logic_vector(8 downto 0);
 	signal cvbs_linebuf_we_rr   : std_logic;
 	signal cvbs_linebuf_addr_rr : std_logic_vector(8 downto 0);
@@ -245,61 +245,62 @@ begin
       vga_vsync <= '1';
       vga_hblank <= '0';
 
-    elsif rising_edge (clk) and vga_clk_ena = '1' then
+    elsif rising_edge (clk) then
+		if vga_clk_ena = '1' then
 
-      -- start hsync when cvbs comes out of vblank
-      if vga_vblank_r = '1' and vga_vblank = '0' then
-        h_count := 0;
-      else
-        if h_count = H_TOTAL_PER_LINE then
-          h_count := 0;
-          vga_hborder <= '0';
-        else
-          h_count := h_count + 1;
-        end if;
-                
-        if h_count = H_FRONT_PORCH then
-		    vga_active_disp_h <= '0';
-          vga_hsync <= '0';
-        elsif h_count = H_HORIZ_SYNC then
-          vga_hsync <= '1';
-        elsif h_count = H_BACK_PORCH then
-		    if overscan = '1' then
-            vga_hblank <= '0';
-			 end if;
-          vga_hborder <= '1';
-        elsif h_count = H_LEFT_BORDER then
-		    vga_active_disp_h <= '1';
-		    if overscan = '0' then
-            vga_hblank <= '0';
-			 end if;
-          active_h_count := (others => '0');
-        elsif h_count = H_VIDEO then
-		    vga_active_disp_h <= '0';
-        elsif h_count = H_VIDEO+1 then
-		    if overscan = '0' then
-            vga_hblank <= '1';
-			 end if;
-        elsif h_count = H_RIGHT_BORDER then
-		    if overscan = '1' then
-            vga_hblank <= '1';
-			 end if;
-          vga_hborder <= '0';
-        else
-          active_h_count := std_logic_vector(unsigned(active_h_count) + 1);
-        end if;
+			-- start hsync when cvbs comes out of vblank
+			if vga_vblank_r = '1' and vga_vblank = '0' then
+			  h_count := 0;
+			else
+			  if h_count = H_TOTAL_PER_LINE then
+				 h_count := 0;
+				 vga_hborder <= '0';
+			  else
+				 h_count := h_count + 1;
+			  end if;
+						 
+			  if h_count = H_FRONT_PORCH then
+				 vga_active_disp_h <= '0';
+				 vga_hsync <= '0';
+			  elsif h_count = H_HORIZ_SYNC then
+				 vga_hsync <= '1';
+			  elsif h_count = H_BACK_PORCH then
+				 if overscan = '1' then
+					vga_hblank <= '0';
+				 end if;
+				 vga_hborder <= '1';
+			  elsif h_count = H_LEFT_BORDER then
+				 vga_active_disp_h <= '1';
+				 if overscan = '0' then
+					vga_hblank <= '0';
+				 end if;
+				 active_h_count := (others => '0');
+			  elsif h_count = H_VIDEO then
+				 vga_active_disp_h <= '0';
+			  elsif h_count = H_VIDEO+1 then
+				 if overscan = '0' then
+					vga_hblank <= '1';
+				 end if;
+			  elsif h_count = H_RIGHT_BORDER then
+				 if overscan = '1' then
+					vga_hblank <= '1';
+				 end if;
+				 vga_hborder <= '0';
+			  else
+				 active_h_count := std_logic_vector(unsigned(active_h_count) + 1);
+			  end if;
 
-      end if;
+			end if;
 
-      -- vertical syncs, blanks are the same
-      vga_vsync <= cvbs_vsync;
+			-- vertical syncs, blanks are the same
+			vga_vsync <= cvbs_vsync;
 
-      -- generate linebuffer address
-      -- - alternate every 2nd line
-      vga_linebuf_addr <= (not v_count(0)) & active_h_count;
+			-- generate linebuffer address
+			-- - alternate every 2nd line
+			vga_linebuf_addr <= (not v_count(0)) & active_h_count;
 
-      vga_vblank_r := vga_vblank;
-
+			vga_vblank_r := vga_vblank;
+		end if ;
     end if;
   end process;
 
@@ -308,7 +309,7 @@ begin
   PROC_CVBS : process (clk, reset)
     variable h_count : integer range 0 to H_TOTAL_PER_LINE;
     variable active_h_count : std_logic_vector(7 downto 0);
-    variable cvbs_hblank_r : std_logic := '0';
+    --vvariable cvbs_hblank_r : std_logic := '0';
     --variable row_v : std_logic_vector(3 downto 0);
     -- for debug only
     variable active_v_count : std_logic_vector(v_count'range);
@@ -325,131 +326,132 @@ begin
       cvbs_vblank <= '1';
 			vga_vblank <= '1';
       da0_int <= (others => '0');
-      cvbs_hblank_r := '0';
+     -- cvbs_hblank_r := '0';
       row_v := (others => '0');
       
-    elsif rising_edge (clk) and cvbs_clk_ena = '1' then
+    elsif rising_edge (clk) then
+		if cvbs_clk_ena = '1' then
 
-      active_h_start <= '0';      -- default
-      
-      if h_count = H_TOTAL_PER_LINE then
-        h_count := 0;
-        if v_count = V2_TOTAL_PER_FIELD then
-          v_count := (others => '0');
-        else
-          v_count := v_count + 1;
-        end if;
+			active_h_start <= '0';      -- default
+			
+			if h_count = H_TOTAL_PER_LINE then
+			  h_count := 0;
+			  if v_count = V2_TOTAL_PER_FIELD then
+				 v_count := (others => '0');
+			  else
+				 v_count := v_count + 1;
+			  end if;
 
-        -- VGA vblank is 1 line behind CVBS
-        -- - because we need to fill the line buffer
-        vga_vblank <= cvbs_vblank;
-        
-        if v_count = V2_FRONT_PORCH then
-          cvbs_vsync <= '0';
-        elsif v_count = V2_VERTICAL_SYNC then
-          cvbs_vsync <= '1';
-        elsif v_count = V2_BACK_PORCH then
-          cvbs_vborder <= '1';
-          cvbs_active_disp_v <= '0';
-		    if overscan = '1' then
-            cvbs_vblank <= '0';
-			 end if;
-        elsif v_count = V2_TOP_BORDER then
-          cvbs_active_disp_v <= '1';
-		    if overscan = '0' then
-            cvbs_vblank <= '0';
-			 end if;
-          row_v := (others => '0');
-          active_v_count := (others => '0');        -- debug only
-        elsif v_count = V2_VIDEO then
-          cvbs_active_disp_v <= '0';
-		    if overscan = '0' then
-            cvbs_vblank <= '1';
-			 end if;
-        elsif v_count = V2_BOTTOM_BORDER then
-		    if overscan = '1' then
-            cvbs_vblank <= '1';
-			 end if;
-          cvbs_vborder <= '0';
-        else
-          if row_v = 11 then
-            row_v := (others => '0');
-            active_v_count := active_v_count + 5;   -- debug only
-          else
-            row_v := row_v + 1;
-            active_v_count := active_v_count + 1;   -- debug only
-          end if;
-        end if;
-        
-      else
-        h_count := h_count + 1;
-        
-        if h_count = H_FRONT_PORCH then
-          cvbs_hsync <= '0';
-        elsif h_count = H_HORIZ_SYNC then
-          cvbs_hsync <= '1';
-        elsif h_count = H_BACK_PORCH then
-		    cvbs_active_disp_h <= '0';
-  		    if overscan = '1' then
-            cvbs_hblank <= '0';
-			 end if;
-        elsif h_count = H_LEFT_BORDER then
-		    cvbs_active_disp_h <= '1';
-  		    if overscan = '0' then
-            cvbs_hblank <= '0';
-			 end if;
-          active_h_count := (others => '0');
-          active_h_start <= '1';
-        elsif h_count = H_VIDEO then
-		    cvbs_active_disp_h <= '0';
-        elsif h_count = H_VIDEO+1 then
-  		    if overscan = '0' then
-            cvbs_hblank <= '1';
-			 end if;
-          -- only needed for debug???
-          active_h_count := active_h_count + 1;
-        elsif h_count =  H_RIGHT_BORDER then
-  		    if overscan = '1' then
-            cvbs_hblank <= '1';
-			 end if;
-        else
-          active_h_count := active_h_count + 1;
-        end if;
-      end if;
-
-      -- generate character rom address
-      char_a <= '0' & dd(5 downto 0) & row_v(3 downto 0);
-     
-			-- DA0 high during FS
-			--if cvbs_vblank = '1' then
-			if cvbs_active_disp_v = '0' then
-				da0_int <= (others => '1');
-			--elsif cvbs_hblank = '1' then
-			elsif cvbs_active_disp_h = '0' then
-        da0_int <= (others => '0');
-      --elsif cvbs_hblank_r = '1' and cvbs_hblank = '0' then
-		elsif active_h_start = '1' then
-				da0_int <= "01000";
-      else
-        da0_int <= da0_int + 1;
+			  -- VGA vblank is 1 line behind CVBS
+			  -- - because we need to fill the line buffer
+			  vga_vblank <= cvbs_vblank;
+			  
+			  if v_count = V2_FRONT_PORCH then
+				 cvbs_vsync <= '0';
+			  elsif v_count = V2_VERTICAL_SYNC then
+				 cvbs_vsync <= '1';
+			  elsif v_count = V2_BACK_PORCH then
+				 cvbs_vborder <= '1';
+				 cvbs_active_disp_v <= '0';
+				 if overscan = '1' then
+					cvbs_vblank <= '0';
+				 end if;
+			  elsif v_count = V2_TOP_BORDER then
+				 cvbs_active_disp_v <= '1';
+				 if overscan = '0' then
+					cvbs_vblank <= '0';
+				 end if;
+				 row_v := (others => '0');
+				 active_v_count := (others => '0');        -- debug only
+			  elsif v_count = V2_VIDEO then
+				 cvbs_active_disp_v <= '0';
+				 if overscan = '0' then
+					cvbs_vblank <= '1';
+				 end if;
+			  elsif v_count = V2_BOTTOM_BORDER then
+				 if overscan = '1' then
+					cvbs_vblank <= '1';
+				 end if;
+				 cvbs_vborder <= '0';
+			  else
+				 if row_v = 11 then
+					row_v := (others => '0');
+					active_v_count := active_v_count + 5;   -- debug only
+				 else
+					row_v := row_v + 1;
+					active_v_count := active_v_count + 1;   -- debug only
+				 end if;
+			  end if;
+			  
+			else
+			  h_count := h_count + 1;
+			  
+			  if h_count = H_FRONT_PORCH then
+				 cvbs_hsync <= '0';
+			  elsif h_count = H_HORIZ_SYNC then
+				 cvbs_hsync <= '1';
+			  elsif h_count = H_BACK_PORCH then
+				 cvbs_active_disp_h <= '0';
+				 if overscan = '1' then
+					cvbs_hblank <= '0';
+				 end if;
+			  elsif h_count = H_LEFT_BORDER then
+				 cvbs_active_disp_h <= '1';
+				 if overscan = '0' then
+					cvbs_hblank <= '0';
+				 end if;
+				 active_h_count := (others => '0');
+				 active_h_start <= '1';
+			  elsif h_count = H_VIDEO then
+				 cvbs_active_disp_h <= '0';
+			  elsif h_count = H_VIDEO+1 then
+				 if overscan = '0' then
+					cvbs_hblank <= '1';
+				 end if;
+				 -- only needed for debug???
+				 active_h_count := active_h_count + 1;
+			  elsif h_count =  H_RIGHT_BORDER then
+				 if overscan = '1' then
+					cvbs_hblank <= '1';
+				 end if;
+			  else
+				 active_h_count := active_h_count + 1;
+			  end if;
 			end if;
 
-      -- generate linebuffer address
-      -- - alternate every line
-      cvbs_linebuf_addr <= v_count(0) & active_h_count;
+			-- generate character rom address
+			char_a <= '0' & dd(5 downto 0) & row_v(3 downto 0);
+		  
+				-- DA0 high during FS
+				--if cvbs_vblank = '1' then
+				if cvbs_active_disp_v = '0' then
+					da0_int <= (others => '1');
+				--elsif cvbs_hblank = '1' then
+				elsif cvbs_active_disp_h = '0' then
+			  da0_int <= (others => '0');
+			--elsif cvbs_hblank_r = '1' and cvbs_hblank = '0' then
+			elsif active_h_start = '1' then
+					da0_int <= "01000";
+			else
+			  da0_int <= da0_int + 1;
+				end if;
 
-      -- pipeline writes to linebuf because data is delayed 1 clock as well!
-			cvbs_linebuf_we_r <= cvbs_linebuf_we;
-			cvbs_linebuf_addr_r <= cvbs_linebuf_addr;
-			cvbs_linebuf_we_rr <= cvbs_linebuf_we_r;
-			cvbs_linebuf_addr_rr <= cvbs_linebuf_addr_r;
+			-- generate linebuffer address
+			-- - alternate every line
+			cvbs_linebuf_addr <= v_count(0) & active_h_count;
 
-      cvbs_hblank_r := cvbs_hblank;
+			-- pipeline writes to linebuf because data is delayed 1 clock as well!
+				cvbs_linebuf_we_r <= cvbs_linebuf_we;
+				cvbs_linebuf_addr_r <= cvbs_linebuf_addr;
+				cvbs_linebuf_we_rr <= cvbs_linebuf_we_r;
+				cvbs_linebuf_addr_rr <= cvbs_linebuf_addr_r;
 
-		o_v_count<=v_count;
-		o_h_count<=std_logic_vector(to_unsigned(h_count,o_h_count'length));
-		
-		
+		--	cvbs_hblank_r := cvbs_hblank;
+
+			o_v_count<=v_count;
+			o_h_count<=std_logic_vector(to_unsigned(h_count,o_h_count'length));
+			
+		end if ;	
     end if; -- cvbs_clk_ena
   end process;
 
@@ -459,92 +461,94 @@ begin
   begin
     if reset = '1' then
       count := (others => '0');
-    elsif rising_edge(clk) and cvbs_clk_ena = '1' then
-      if active_h_start = '1' then
-        --count := (others => '1');
-        count :=  "0010";
-        -- count :=  count_offset+1;
-      end if;
-      if an_g_s = '0' then
-        -- alpha-semi modes
-        if count(2 downto 0) = 0 then
-          -- handle alpha-semi latching
-          an_s_r <= an_s_s;
-          inv_r <= inv_s;
-          if an_s_s = '0' then
-            dd_r <= char_d_o;                               -- alpha mode
-          else
-            -- store luma,chroma(2..0),luma,chroma(2..0)
-            if intn_ext_s = '0' then                        -- semi-4
-              if row_v < 6 then
-                dd_r <= dd(3) & dd(6) & dd(5) & dd(4) & 
-                        dd(2) & dd(6) & dd(5) & dd(4);
-              else
-                dd_r <= dd(1) & dd(6) & dd(5) & dd(4) & 
-                        dd(0) & dd(6) & dd(5) & dd(4);
-              end if;
-            else                                            -- semi-6
-              if row_v < 4 then
-                dd_r <= dd(5) & css_s & dd(7) & dd(6) & 
-                        dd(4) & css_s & dd(7) & dd(6);
-              elsif row_v < 8 then
-                dd_r <= dd(3) & css_s & dd(7) & dd(6) & 
-                        dd(2) & css_s & dd(7) & dd(6);
-              else
-                dd_r <= dd(1) & css_s & dd(7) & dd(6) & 
-                        dd(0) & css_s & dd(7) & dd(6);
-              end if;
-            end if;
-          end if;
-        else
-          -- handle alpha-semi shifting
-          if an_s_r = '0' then
-            dd_r <= dd_r(dd_r'left-1 downto 0) & '0';       -- alpha mode
-          else
-            if count(1 downto 0) = 0 then
-              dd_r <= dd_r(dd_r'left-4 downto 0) & "0000";  -- semi mode
-            end if;
-          end if;
-        end if;
-      else
-        -- graphics modes
-        --if IN_SIMULATION then
-          an_s_r <= '0';
-        --end if;
-        case gm_s is
-          when "000" | "001" | "011" | "101" =>     -- CG1/RG1/RG2/RG3
-            if count(3 downto 0) = 0 then
-              -- handle graphics latching
-              dd_r <= dd;
-            else
-              -- handle graphics shifting
-              if gm_s = "000" then
-                if count(1 downto 0) = 0 then
-                  dd_r <= dd_r(dd_r'left-2 downto 0) & "00";  -- CG1
-                end if;
-              else
-                if count(0) = '0' then
-                  dd_r <= dd_r(dd_r'left-1 downto 0) & '0';   -- RG1/RG2/RG3
-                end if;
-              end if;
-            end if;
-          when others =>                            -- CG2/CG3/CG6/RG6
-            if count(2 downto 0) = 0 then
-              -- handle graphics latching
-              dd_r <= dd;
-            else
-              -- handle graphics shifting
-              if gm_s = "111" then
-                dd_r <= dd_r(dd_r'left-1 downto 0) & '0';     -- RG6
-              else
-                if count(0) = '0' then
-                  dd_r <= dd_r(dd_r'left-2 downto 0) & "00";  -- CG2/CG3/CG6
-                end if;
-              end if;
-            end if;
-        end case;
-      end if;
-      count := count + 1;
+    elsif rising_edge(clk) then
+		if cvbs_clk_ena = '1' then
+			if active_h_start = '1' then
+			  --count := (others => '1');
+			  count :=  "0010";
+			  -- count :=  count_offset+1;
+			end if;
+			if an_g_s = '0' then
+			  -- alpha-semi modes
+			  if count(2 downto 0) = 0 then
+				 -- handle alpha-semi latching
+				 an_s_r <= an_s_s;
+				 inv_r <= inv_s;
+				 if an_s_s = '0' then
+					dd_r <= char_d_o;                               -- alpha mode
+				 else
+					-- store luma,chroma(2..0),luma,chroma(2..0)
+					if intn_ext_s = '0' then                        -- semi-4
+					  if row_v < 6 then
+						 dd_r <= dd(3) & dd(6) & dd(5) & dd(4) & 
+									dd(2) & dd(6) & dd(5) & dd(4);
+					  else
+						 dd_r <= dd(1) & dd(6) & dd(5) & dd(4) & 
+									dd(0) & dd(6) & dd(5) & dd(4);
+					  end if;
+					else                                            -- semi-6
+					  if row_v < 4 then
+						 dd_r <= dd(5) & css_s & dd(7) & dd(6) & 
+									dd(4) & css_s & dd(7) & dd(6);
+					  elsif row_v < 8 then
+						 dd_r <= dd(3) & css_s & dd(7) & dd(6) & 
+									dd(2) & css_s & dd(7) & dd(6);
+					  else
+						 dd_r <= dd(1) & css_s & dd(7) & dd(6) & 
+									dd(0) & css_s & dd(7) & dd(6);
+					  end if;
+					end if;
+				 end if;
+			  else
+				 -- handle alpha-semi shifting
+				 if an_s_r = '0' then
+					dd_r <= dd_r(dd_r'left-1 downto 0) & '0';       -- alpha mode
+				 else
+					if count(1 downto 0) = 0 then
+					  dd_r <= dd_r(dd_r'left-4 downto 0) & "0000";  -- semi mode
+					end if;
+				 end if;
+			  end if;
+			else
+			  -- graphics modes
+			  --if IN_SIMULATION then
+				 an_s_r <= '0';
+			  --end if;
+			  case gm_s is
+				 when "000" | "001" | "011" | "101" =>     -- CG1/RG1/RG2/RG3
+					if count(3 downto 0) = 0 then
+					  -- handle graphics latching
+					  dd_r <= dd;
+					else
+					  -- handle graphics shifting
+					  if gm_s = "000" then
+						 if count(1 downto 0) = 0 then
+							dd_r <= dd_r(dd_r'left-2 downto 0) & "00";  -- CG1
+						 end if;
+					  else
+						 if count(0) = '0' then
+							dd_r <= dd_r(dd_r'left-1 downto 0) & '0';   -- RG1/RG2/RG3
+						 end if;
+					  end if;
+					end if;
+				 when others =>                            -- CG2/CG3/CG6/RG6
+					if count(2 downto 0) = 0 then
+					  -- handle graphics latching
+					  dd_r <= dd;
+					else
+					  -- handle graphics shifting
+					  if gm_s = "111" then
+						 dd_r <= dd_r(dd_r'left-1 downto 0) & '0';     -- RG6
+					  else
+						 if count(0) = '0' then
+							dd_r <= dd_r(dd_r'left-2 downto 0) & "00";  -- CG2/CG3/CG6
+						 end if;
+					  end if;
+					end if;
+			  end case;
+			end if;
+			count := count + 1;
+		end if ;
     end if;
   end process;
 
@@ -554,47 +558,48 @@ begin
     variable chroma : std_logic_vector(2 downto 0);
   begin
     if reset = '1' then
-    elsif rising_edge(clk) and cvbs_clk_ena = '1' then
-      -- alpha/graphics mode
-      if an_g_s = '0' then
-        -- alphanumeric & semi-graphics mode
-        luma := dd_r(dd_r'left);
-        if an_s_r = '0' then
-          -- alphanumeric
-          if intn_ext_s = '0' then
-            -- internal rom
-            chroma := (others => css_s);
-            if inv_r = '1' then
-              luma := not luma;
-            end if; -- normal/inverse
-          else
-            -- external ROM?!?
-          end if; -- internal/external
-        else
-          chroma := dd_r(dd_r'left-1 downto dd_r'left-3);
-        end if; -- alphanumeric/semi-graphics
-      else
-        -- graphics mode
-        case gm_s is
-          when "000" =>                     -- CG1 64x64x4
-            luma := '1';
-            chroma := css_s & dd_r(dd_r'left downto dd_r'left-1);
-          when "001" | "011" | "101" =>     -- RG1/2/3 128x64/96/192x2
-            luma := dd_r(dd_r'left);
-            chroma := css_s & "00";         -- green/buff
-          when "010" | "100" | "110" =>     -- CG2/3/6 128x64/96/192x4
-            luma := '1';
-            chroma := css_s & dd_r(dd_r'left downto dd_r'left-1);
-          when others =>                    -- RG6 256x192x2
-            luma := dd_r(dd_r'left);
-            chroma := css_s & "00";         -- green/buff
-        end case;
-      end if; -- alpha/graphics mode
+    elsif rising_edge(clk) then
+		if cvbs_clk_ena = '1' then
+			-- alpha/graphics mode
+			if an_g_s = '0' then
+			  -- alphanumeric & semi-graphics mode
+			  luma := dd_r(dd_r'left);
+			  if an_s_r = '0' then
+				 -- alphanumeric
+				 if intn_ext_s = '0' then
+					-- internal rom
+					chroma := (others => css_s);
+					if inv_r = '1' then
+					  luma := not luma;
+					end if; -- normal/inverse
+				 else
+					-- external ROM?!?
+				 end if; -- internal/external
+			  else
+				 chroma := dd_r(dd_r'left-1 downto dd_r'left-3);
+			  end if; -- alphanumeric/semi-graphics
+			else
+			  -- graphics mode
+			  case gm_s is
+				 when "000" =>                     -- CG1 64x64x4
+					luma := '1';
+					chroma := css_s & dd_r(dd_r'left downto dd_r'left-1);
+				 when "001" | "011" | "101" =>     -- RG1/2/3 128x64/96/192x2
+					luma := dd_r(dd_r'left);
+					chroma := css_s & "00";         -- green/buff
+				 when "010" | "100" | "110" =>     -- CG2/3/6 128x64/96/192x4
+					luma := '1';
+					chroma := css_s & dd_r(dd_r'left downto dd_r'left-1);
+				 when others =>                    -- RG6 256x192x2
+					luma := dd_r(dd_r'left);
+					chroma := css_s & "00";         -- green/buff
+			  end case;
+			end if; -- alpha/graphics mode
 
-      -- pack source data into line buffer
-      -- - palette lookup on output
-      pixel_data <= '0' & css_s & an_g_s & an_s_r & luma & chroma;
-
+			-- pack source data into line buffer
+			-- - palette lookup on output
+			pixel_data <= '0' & css_s & an_g_s & an_s_r & luma & chroma;
+		end if;
     end if;
   end process;
 
@@ -617,7 +622,7 @@ begin
 	-- -  we do that at the output so we can use a 
 	--    higher colour-resolution palette
 	--    without using memory in the line buffer
-  PROC_OUTPUT : process (clk)
+  PROC_OUTPUT : process (clk, reset)
     variable r : std_logic_vector(red'range);
     variable g : std_logic_vector(green'range);
     variable b : std_logic_vector(blue'range);
@@ -723,22 +728,23 @@ begin
           end if;
         end if;
       end if; -- CVBS_NOT_VGA
-      red <= r; green <= g; blue <= b;
-    end if; -- rising_edge(clk)
-    
-    if CVBS_NOT_VGA then
-      hsync <= cvbs_hsync;
-      vsync <= cvbs_vsync;
-      hblank <= cvbs_hblank;
-      vblank <= cvbs_vblank;
-		pixel_clock<=cvbs_clk_ena;
-    else
-      hsync <= vga_hsync;
-      vsync <= vga_vsync;
-      hblank <= not vga_hborder; --vga_hblank;
-      vblank <= not cvbs_vborder; --vga_vblank;
-		pixel_clock<=vga_clk_ena;
-    end if;
+			red <= r; green <= g; blue <= b;
+
+			if CVBS_NOT_VGA then
+				hsync <= cvbs_hsync;
+				vsync <= cvbs_vsync;
+				hblank <= cvbs_hblank;
+				vblank <= cvbs_vblank;
+				pixel_clock<=cvbs_clk_ena;
+			else
+				hsync <= vga_hsync;
+				vsync <= vga_vsync;
+				hblank <= not vga_hborder; --vga_hblank;
+				vblank <= not cvbs_vborder; --vga_vblank;
+				pixel_clock<=vga_clk_ena;
+			end if;
+			 
+		end if; -- rising_edge(clk)
   end process PROC_OUTPUT;
 
 	-- fixme (clocking)!!!

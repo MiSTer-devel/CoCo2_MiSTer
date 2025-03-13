@@ -179,6 +179,7 @@ module emu
 
 //assign ADC_BUS  = 'Z;
 assign USER_OUT = '1;
+
 assign {UART_RTS, UART_TXD, UART_DTR} = 0;
 assign {SD_SCK, SD_MOSI, SD_CS} = 'Z;
 assign {SDRAM_DQ, SDRAM_A, SDRAM_BA, SDRAM_CLK, SDRAM_CKE, SDRAM_DQML, SDRAM_DQMH, SDRAM_nWE, SDRAM_nCAS, SDRAM_nRAS, SDRAM_nCS} = 'Z;
@@ -209,13 +210,15 @@ assign BUTTONS = 0;
 //////////////////////////////////////////////////////////////////
 
 
-wire [1:0] ar = status[20:19];
+wire ar = status[19];
 
-assign VIDEO_ARX = (!ar) ? 12'd4 : (ar - 1'd1);
-assign VIDEO_ARY = (!ar) ? 12'd3 : 12'd0;
+assign VIDEO_ARX = (!ar) ? 13'd4 : 13'd16;
+assign VIDEO_ARY = (!ar) ? 13'd3 : 13'd9;
 
 
 `include "build_id.v"
+`include "build_id_num.v"
+
 localparam CONF_STR = {
 	"CoCo2;;",
 	"-;",
@@ -228,16 +231,22 @@ localparam CONF_STR = {
 	"H2S3,DSK,Load Disk Drive 3;",
 	"-;",
 	"OC,Tape Input,File,ADC;",
+    "-;",
 	"H0F2,CAS,Load Cassette;",
-	"H0TF,Stop & Rewind;",
+	"H0TR,Stop & Rewind;",
+    "-;",
+    "H0S4,CAS,Save Cassette;",
+    "H0OS,Cass Rwd=0 / Rec=1,0,1;",
+    "-;",
+
 	"OD,Monitor Tape Sound,No,Yes;",
-   "OG,Show Tape Status,Yes,No;",
+	"OQ,Show Tape Status,Yes,No;",
 	"-;",
 	"P1,Video Settings;",
 	"P1-;",
 	"P1-, -= Video Settings =-;",
 	"P1-;",
-	"P1OJK,Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
+	"P1OJ,Aspect ratio,Original,Full Screen;",
 	"P1OFH,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;", 
 	"P1O4,Overscan,Hidden,Visible;",
 	"P1O3,Artifact,Enable,Disable;",
@@ -249,16 +258,26 @@ localparam CONF_STR = {
 	"OA,Swap Joysticks,Off,On;",
 	"-;",
 	"O89,Machine,CoCo2,Dragon32,Dragon64;",
-	"O7,Turbo,Off,On;",
+//	"O7,Turbo,Off,On;",			// Code left in place for menu based activation / deactivation
 	"-;",
+`ifdef USE_OVERLAY
 	"OB,Debug display,Off,On;",
 	"-;",
+`endif
 	"RN,Hard Reset;",
 	"R0,Reset;",
 	"J,Button;",
 	"jn,A;",
-	"V,v",`BUILD_DATE
+    "V,v",{`BUILD_DATE,"-",`BUILD_NUMBER}
 };
+
+
+//   Status Bit Map:
+//               Upper                             Lower              
+//   0         1         2         3          4         5         6   
+//   01234567890123456789012345678901 23456789012345678901234567890123
+//   0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
+// 
 
 wire forced_scandoubler;
 wire  [1:0] buttons;
@@ -271,21 +290,21 @@ wire  [7:0] ioctl_data;
 wire  [7:0] ioctl_index;
 
 // SD block level interface
-wire	[3:0]  	img_mounted;
+wire	[4:0]  	img_mounted;
 wire				img_readonly;
 wire	[19:0] 	img_size;
 
-wire	[31:0] 	sd_lba[4];
-wire	[5:0] 	sd_blk_cnt[4];
+wire	[31:0] 	sd_lba[5];
+wire	[5:0] 	sd_blk_cnt[5];
 
-wire	[3:0]		sd_rd;
-wire	[3:0]		sd_wr;
-wire	[3:0]		sd_ack;
+wire	[4:0]		sd_rd;
+wire	[4:0]		sd_wr;
+wire	[4:0]		sd_ack;
 
 // SD byte level access. Signals for 2-PORT altsyncram.
 wire  [8:0] 	sd_buff_addr;
 wire  [7:0] 	sd_buff_dout;
-wire  [7:0] 	sd_buff_din[4];
+wire  [7:0] 	sd_buff_din[5];
 wire        	sd_buff_wr;
 
 
@@ -295,7 +314,7 @@ wire [15:0] joya1, joya2;
 wire [21:0] gamma_bus;
 
 
-hps_io #(.CONF_STR(CONF_STR),.VDNUM(4),.BLKSZ(2)) hps_io
+hps_io #(.CONF_STR(CONF_STR),.VDNUM(5),.BLKSZ(2)) hps_io
 (
 	.clk_sys(clk_sys),
 	.HPS_BUS(HPS_BUS),
@@ -444,8 +463,9 @@ wire [31:0] coco_joy2 = status[10] ? joy1 : joy2;
 wire [15:0] coco_ajoy1 = status[10] ? {center_joystick_x2[7:0],center_joystick_y2[7:0]} : {center_joystick_x1[7:0],center_joystick_y1[7:0]};
 wire [15:0] coco_ajoy2 = status[10] ? {center_joystick_x1[7:0],center_joystick_y1[7:0]} : {center_joystick_x2[7:0],center_joystick_y2[7:0]};
 
-wire show_cas_overlay = ~status[16];
+wire show_cas_overlay = ~status[26];
 
+wire CASS_REWIND_RECORD = status[28];
 
 wire casdout;
 wire cas_relay;
@@ -457,9 +477,10 @@ reg hard_reset_r;
 reg machine_select_reset;
 reg [3:0]reset_count;
 reg [1:0] hard_reset_state = 2'b00;
-reg disk_cart_enabled;
+reg disk_cart_enabled, disk_cart_enabled_r;
 //wire disk_cart_enabled = status[14] & status[9:8]==2'b00;
 reg hard_reset;
+
 
 always @(posedge clk_sys)
 begin
@@ -467,18 +488,28 @@ begin
  dragon64 <= (status[9:8]==2'b10);
  dragon   <= (status[9:8]!=2'b00);
  disk_cart_enabled <= (status[14]);
+ disk_cart_enabled_r <= disk_cart_enabled;
 
  if (hard_reset_r!=status[23])
  begin
 	reset_count<=4'b1111;
-        hard_reset_state = 2'b01;
+    hard_reset_state = 2'b01;
  end
 
  if (machineselect_r!=status[9:8])
  begin
 	reset_count<=4'b1111;
-        //hard_reset_state = 2'b01; // for now don't force hard reset when
-	//switching systems
+	hard_reset_state = 2'b01; // for now don't force hard reset when
+							  //switching systems
+							  // SRH 1/26/25 Added back in to reset whenever system changes [dragon, dragon32, coco2]
+ end
+
+ if (disk_cart_enabled_r!=disk_cart_enabled)
+ begin
+	reset_count<=4'b1111;
+	hard_reset_state = 2'b01; // for now don't force hard reset when
+							  //switching systems
+							  // SRH 1/26/25 Added back in to reset whenever system changes [disk / cart]
  end
  case (hard_reset_state)
 	2'b00: 
@@ -511,8 +542,8 @@ end
 
 dragoncoco dragoncoco(
   .clk(clk_sys), // 50 mhz
-  .turbo(status[7]&cas_relay),
-  .reset_n(~reset),
+  .turbo(status[7]),
+  .trig_reset_n(~reset),
   .hard_reset(hard_reset),
   .dragon(dragon),
   .dragon64(dragon64),
@@ -526,6 +557,7 @@ dragoncoco dragoncoco(
   .hsync(HSync),
   .vsync(VSync),
   .vclk(vclk),
+  // .sam_a01(sam_a01),
   // input ps2_clk,
   // input ps2_dat,
   .uart_din(1'b0),
@@ -536,6 +568,9 @@ dragoncoco dragoncoco(
   .ioctl_download(ioctl_download),
   .ioctl_index(ioctl_index),
   .ioctl_wr(ioctl_wr),
+  .roms_loaded(roms_found),
+  .roms_reset(RESET),
+  
   .casdout(status[12] ? adc_cassette_bit : casdout),
   .cas_relay(cas_relay),
   .artifact_phase(status[2]),
@@ -582,9 +617,9 @@ dragoncoco dragoncoco(
   .sd_buff_dout(sd_buff_dout),
   .sd_buff_din(sd_buff_din),
   .sd_buff_wr(sd_buff_wr),
-  .CLK50MHZ(CLK_50M)
+  .CLK50MHZ(CLK_50M),
 
-
+  .CASS_REWIND_RECORD(CASS_REWIND_RECORD)
 
 );
 
@@ -619,7 +654,7 @@ cassette cassette(
   .clk(clk_sys),
   .Q(clk_Q_out),
 
-  .rewind(status[15]| (load_tape&ioctl_download)),
+  .rewind(status[27]| (load_tape&ioctl_download)),
   .en(cas_relay),
 
   .sdram_addr(sdram_addr),
@@ -668,8 +703,18 @@ wire       scandoubler = (scale || forced_scandoubler);
 assign VGA_SL = sl[1:0];
 
 wire freeze_sync;
+wire [3:0] sam_a01;
 
+// debug on USER port (I use a physical oscilloscope and data analyzer)
+//assign USER_OUT[0] = sam_a01[1] ;//hblank
+//assign USER_OUT[1] = HSync ;
+//assign USER_OUT[2] = sam_a01[3]; //hs_n
+//assign USER_OUT[3] = '0;
+//assign USER_OUT[4] = sam_a01[0]; //sam_a[0]
+//assign USER_OUT[5] = sam_a01[2]; //da0
+//assign USER_OUT[6] = VSync;
 
+// assign USER_OUT[6:2]='1 ;
 
 video_mixer #(.LINE_LENGTH(380), .GAMMA(1)) video_mixer
 (
@@ -690,17 +735,14 @@ video_mixer #(.LINE_LENGTH(380), .GAMMA(1)) video_mixer
 
 `ifdef USE_OVERLAY
 	// mix in overlay!
-	wire [7:0]rr = o_r | {C_R,C_R};
-	wire [7:0]gg = o_g | {C_R,C_R};
-	wire [7:0]bb = o_b | {C_R,C_R};
+	wire [7:0]rr = o_r | C_R | CN_R;
+	wire [7:0]gg = o_g | C_R | CN_R;
+	wire [7:0]bb = o_b | C_R ;
 `else
-	wire [7:0]rr = o_r;
-	wire [7:0]gg = o_g;
-	wire [7:0]bb = o_b;
+	wire [7:0]rr = o_r | CN_R;
+	wire [7:0]gg = o_g | CN_R;
+	wire [7:0]bb = o_b ;
 `endif
-
-reg  [26:0] act_cnt;
-always @(posedge clk_sys) act_cnt <= act_cnt + 1'd1;
 
 assign LED_USER    = 1'b0;
 
@@ -710,7 +752,7 @@ reg [8:0] HCount,VCount;
 
 `ifdef USE_OVERLAY
 
-reg [3:0] C_R,C_G,C_B;
+reg [7:0] C_R,C_G,C_B;
 
 wire [159:0]DLine1;
 wire [159:0]DLine2;
@@ -718,9 +760,9 @@ wire [159:0]DLine2;
 
 ovo OVERLAY
 (
-    .i_r(4'd0),
-    .i_g(4'd0),
-    .i_b(4'd0),
+    .i_r(8'd0),
+    .i_g(8'd0),
+    .i_b(8'd0),
     .i_clk(clk_sys),
 
 	 .i_Hcount(HCount),
@@ -736,6 +778,66 @@ ovo OVERLAY
 );
 
 `endif
+
+wire [3:0] roms_found ;
+wire [159:0]NOrom1;
+wire [159:0]NOrom2;
+reg [7:0]  CN_R ;
+
+ovo #(.COLS(32), .LINES(32)) NOROMOVO
+(
+    .i_r(8'd0),
+    .i_g(8'd0),
+    .i_b(8'd0),
+    .i_clk(clk_sys),
+	 .i_Hcount(HCount),
+	 .i_VCount(VCount),
+    .o_r(CN_R),
+    .ena((dragon64 & ~roms_found[2]) | (dragon & ~dragon64 & ~roms_found[1]) | (~dragon & ~roms_found[0]) | (disk_cart_enabled & ~roms_found[3]) ),
+    .in0(NOrom1),
+    .in1(NOrom2)
+);
+
+assign NOrom2 = {
+{32{5'b10000}}
+};
+
+assign NOrom1 = {
+//{17{5'b10000}},
+5'b10000,						// space
+5'b11011,						// N
+5'b11100,						// O
+5'b10000,						// space
+5'b11101,						// R
+5'b11100,						// O
+5'b11110,						// M
+5'b10000,						// space
+5'b10011,						// -
+5'b10000,						// space
+5'b11011,						// N
+5'b11100,						// O
+5'b10000,						// space
+5'b11101,						// R
+5'b11100,						// O
+5'b11110,						// M
+5'b10000,						// space
+5'b11011,						// N
+5'b11100,						// O
+5'b10000,						// space
+5'b11101,						// R
+5'b11100,						// O
+5'b11110,						// M
+5'b10000,						// space
+5'b10011,						// -
+5'b10000,						// space
+5'b11011,						// N
+5'b11100,						// O
+5'b10000,						// space
+5'b11101,						// R
+5'b11100,						// O
+5'b11110						   // M
+};
+
 
 
 endmodule

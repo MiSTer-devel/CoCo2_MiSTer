@@ -37,12 +37,13 @@ module wd1793 #(parameter RWMODE=0, EDSK=1)
 	output       drq,         // DMA request
 	output       intrq,
 	output       busy,
+	input 		 dragon,
 
 	input        wp,          // write protect
 
 	input  [2:0] size_code,
 	input        layout,      // 0 = Track-Side-Sector, 1 - Side-Track-Sector
-	input        side,
+	input        coco_side,
 	input        ready,
 
 	// SD access (RWMODE == 1)
@@ -66,6 +67,7 @@ module wd1793 #(parameter RWMODE=0, EDSK=1)
 	output[19:0] buff_addr,	  // buffer RAM address
 	output       buff_read,	  // buffer RAM read enable
 	input  [7:0] buff_din     // buffer RAM data input
+
 );
 
 // Possible track configs:
@@ -75,6 +77,8 @@ module wd1793 #(parameter RWMODE=0, EDSK=1)
 // 3:  5 x 1024 = 5.0KB
 // 4: 10 x 512  = 5.0KB
 // 5: 18 x 256  = 4.5KB (SRH)
+
+assign side = (dragon) ? (dragon_side & ~layout) : coco_side ;
 
 assign dout      = q;
 assign drq       = s_drq;
@@ -91,6 +95,7 @@ wire [10:0] sector_size = 11'd128 << wd_size_code;
 reg  [10:0] byte_addr;
 reg  [19:0] buff_a;
 reg   [1:0] wd_size_code;
+reg  dragon_side, side ;
 
 wire  [7:0] buff_dout;
 reg   [1:0] sd_block = 0;
@@ -330,6 +335,8 @@ always @(posedge clk_sys) begin
 		data_length <= 0;
 		byte_addr <=0;
 		buff_rd <= 0;
+		dragon_side <= 0;
+		
 		if(RWMODE) buff_wr <= 0;
 		state <= STATE_IDLE;
 		cmd_mode <= 0;
@@ -501,7 +508,8 @@ always @(posedge clk_sys) begin
 								wdreg_sector <= wdreg_sector + 1'b1;
 								state <= STATE_SEARCH;
 							end else begin
-								state <= STATE_ENDCOMMAND;
+//								state <= STATE_ENDCOMMAND; 1/30/25 SRH & jF Fix too early interrupt for dragon
+								state <= STATE_WAIT;
 							end
 						end else begin
 							byte_addr <= byte_addr + 1'd1;
@@ -692,7 +700,8 @@ always @(posedge clk_sys) begin
 									edsk_start  <= 0;
 									edsk_addr   <= 0;
 									state       <= STATE_SEARCH;
-									s_wpe       <= din[5];
+									s_wpe       <= din[5] ;
+									dragon_side <= din[1] ;
 
 									if(s_readonly & din[5]) begin
 										s_wrfault <= 1;
@@ -716,7 +725,7 @@ always @(posedge clk_sys) begin
 									data_length <= 6;
 
 									read_addr[0] <= disk_track;
-									read_addr[1] <= {7'b0, side};
+									read_addr[1] <= {7'b0, dragon ? din[1] : side}; // jF DS support for Dragon [2797]
 									read_addr[2] <= ra_sector;
 									read_addr[3] <= wd_size_code;
 									read_addr[4] <= 0;
@@ -738,6 +747,7 @@ always @(posedge clk_sys) begin
 									{s_wrfault,s_seekerr,s_crcerr,s_lostdata} <= 0;
 									s_drq_busy <= 2'b01;
 									state <= STATE_WAIT;
+									dragon_side <= din[1] ;  // jF DS support for Dragon [2797]
 								end
 							'hE:	// READ TRACK
 								begin
@@ -745,6 +755,7 @@ always @(posedge clk_sys) begin
 									s_seekerr  <= 1;
 									s_drq_busy <= 2'b01;
 									state <= STATE_WAIT;
+									dragon_side <= din[1] ;  // jF DS support for Dragon [2797]
 								end
 							endcase
 						end

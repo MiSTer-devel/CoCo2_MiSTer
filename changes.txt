@@ -1,14 +1,22 @@
-CoCo2_20240605
-1.	Fixed MiSTer / CoCo2 interface preventing the joysticks ever reaching the
-	max value of 63. Specifically '>' was changed to '>=' the DTOA values.
-	Additionally, fixed DPAD emulation to reach extremes for all buttoms. 
-	This is verified in Tandy Diagnostics. 
+CoCo2_20250215 - 001 RC6
+1:	Recursion testing spreadsheet completed.
+2:	Updated MiSTer template
+3:	Added Daily Build Number.  Note sys/build_num.tcl changed to add this functionality.
+	Updating the template in the future will need to restore this version to prevent
+	the loss of this functtion.
+4:  Changed back to Cycle accurate 09
+5:  Fixed Timer [The FDC cartridge does not generate a FIRQ when asserted.  This was fixed..]
+6:  Double speed poke in the SAM via SAM registers coded.  Video sync at high speed fixed
+7:  FDC changed to use system clk and divide to 8 Mhz changed to /6.  FIRQ generation
+    for Dragon, qualified enabled only in Dragon configurations.
+8:	Fixed some incorrect menu subscript duplications
+9:	Added Cassette Save
+10: Added minor delay to 1793 interrupt to fix dragon os9 problem.  Also removed HALT from
+    dragon FDC.
+11: Nitro OS9 working on CoCo & Dragon64.
+12:	ROMs removed from .rbf.  Instructions for the creation in the README.MD file.  Code added
+    to show 'NO ROMS' on output video without roms being found on load of core.
 
 To Do...
-1:	Get FDC working for dragon
-3:	Change back to Cycle accurate 09
-4:	Add Cassette Save
-5:	Update the Template
-6:	Add Daily Build Number
-7:	Create compatible software tested spreadsheet
-8:	Fix double speed poke in the SAM
+
+

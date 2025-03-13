@@ -52,14 +52,14 @@
 module fdc(
 	input        		CLK,     		// clock
 	input        		RESET_N,	   	// async reset
+	input					dragon,			// Coco or Dragon ?
 	input  		[1:0]	ADDRESS,       	// i/o port addr [extended for coco]
 	input  		[7:0]	DATA_IN,        // data in
-	output 		[7:0] 	DATA_HDD,      	// data out
+	output 		[7:0] DATA_HDD,      	// data out
 	output       		HALT,         	// DMA request
 	output       		NMI_09,
 	output       		FIRQ,
 
-	input				DS_ENABLE,		// Turn on DS support
 
 	input				FF40_CLK,		// FDC Write support
 	input				FF40_ENA,
@@ -86,9 +86,8 @@ module fdc(
 	input  		[8:0]	sd_buff_addr,
 	input  		[7:0] 	sd_buff_dout,
 	output 		[7:0] 	sd_buff_din[4],
-	input        		sd_buff_wr,
+	input        		sd_buff_wr
 	
-	output		[7:0]	probe
 );
 
 wire	[7:0]	DRIVE_SEL_EXT;
@@ -97,14 +96,17 @@ wire			WRT_PREC;
 wire			DENSITY;
 wire			HALT_EN;
 
-// Diagnostics only
-assign probe = {2'd0, HALT_EN_RST, sd_buff_wr, WR[0], RD[0], HALT_EN, HALT};
 
-// Generate a 8.333 Mhz enable for the fdc... and control writes
-wire ena_8Mhz;
+// Generate a 8.333 Mhz enable for the fdc... and control writes 
+// Dragon needs a 1.5 Mhz clock
+
+wire ena_8Mhz ; 
+wire [6:0] fdc_clk_dvd ;
 wire [5:0]	div_8mhz;
 
-assign ena_8Mhz = (div_8mhz == 6'd5) ? 1'b1: 1'b0;
+// yet another poorly documented difference between Dragon and CoCo2 : clock of the disk controller is 8Mhz for Coco and 1.5Mhz for Dragon
+assign fdc_clk_dvd = (dragon ) ? 6'd38 : 6'd6 ;
+assign ena_8Mhz = (div_8mhz == fdc_clk_dvd) ? 1'b1: 1'b0;
 
 always@(negedge CLK or negedge RESET_N)
 begin
@@ -118,17 +120,11 @@ begin
 		end
 end
 
-localparam SDC_MAGIC_CMD = 			4'd0;
 
-wire	[7:0]	FF40_READ_VALUE = {HALT_EN, DRIVE_SEL_EXT[3], DENSITY, WRT_PREC, MOTOR,	DRIVE_SEL_EXT[2:0]};
-wire			SDC_EN = (FF40_READ_VALUE == SDC_MAGIC_CMD);
-wire	[7:0]	SDC_READ_DATA;
-
-assign SDC_READ_DATA = 8'h00;  // To be deleted.
+wire	[7:0]	FF40_READ_VALUE =  {HALT_EN, DRIVE_SEL_EXT[3], DENSITY, WRT_PREC, MOTOR,	DRIVE_SEL_EXT[2:0]};
 
 //FDC read data path.  =$ff40 or wd1793(s)
-assign	DATA_HDD =		(SDC_EN)							?	SDC_READ_DATA:
-						(FF40_RD)							?	FF40_READ_VALUE:
+assign	DATA_HDD =		(FF40_RD)							?	FF40_READ_VALUE:
 						(WD1793_RD)							?	DATA_1793: //(1793[s])
 																8'h00;
 
@@ -152,40 +148,51 @@ begin
 		MOTOR <= 1'b0;
 		WRT_PREC <= 1'b0;
 		DENSITY <= 1'b0;
-		drive_index <= 3'd0;
-	end
-	else
+		drive_index <= 3'b000; 
+	end else
 	begin
 		if (FF40_ENA)
 		begin
-			DRIVE_SEL_EXT <= 	{4'b0000,
-								DATA_IN[6],		// Drive Select [3] / Side Select
-								DATA_IN[2:0]};	// Drive Select [2:0]
-			MOTOR <= DATA_IN[3];				// Turn on motor, not used here just checked, 0=MotorOff 1=MotorOn
-			WRT_PREC <= DATA_IN[4];				// Write Precompensation, not used here
-			DENSITY <= DATA_IN[5];				// Density, not used here just checked
-			case(DRIVE_SEL_EXT_PRE)
-			4'b1000:
-				drive_index <= 3'd3;
+			if (dragon) 
+			begin
+//				drive_index <= { ~DATA_IN[2], DATA_IN[1:0] } ; //bit2='0 means no drive selected and no motor 
+				drive_index <= { 1'b0, DATA_IN[1:0] } ; // SRH & jF removed motor from causing selects to be out of range 
+				MOTOR <= DATA_IN[2];
+				DRIVE_SEL_EXT <= DATA_IN ; // only for DRIVE_SEL_EXT[3] for double-density 
+				DENSITY <= DATA_IN[5] ;
+			end else begin
+				DRIVE_SEL_EXT <= 	{4'b0000,
+									DATA_IN[6],		// Drive Select [3] / Side Select
+									DATA_IN[2:0]};	// Drive Select [2:0]
+				MOTOR <= DATA_IN[3];				// Turn on motor, not used here just checked, 0=MotorOff 1=MotorOn
+				WRT_PREC <= DATA_IN[4];				// Write Precompensation, not used here
+				DENSITY <= DATA_IN[5];				// Density, not used here just checked
+				case(DRIVE_SEL_EXT_PRE)
+				4'b1000:
+					drive_index <= 3'd3;
 
-			4'b0100:
-				drive_index <= 3'd2;
-		
-			4'b0010:
-				drive_index <= 3'd1;
+				4'b0100:
+					drive_index <= 3'd2;
 			
-			4'b0001:
-				drive_index <= 3'd0;
-			
-			4'b1100:
-				drive_index <= 3'd2;
-			
-			4'b1010:
-				drive_index <= 3'd1;
-			
-			4'b1001:
-				drive_index <= 3'd0;
-			endcase
+				4'b0010:
+					drive_index <= 3'd1;
+				
+				4'b0001:
+					drive_index <= 3'd0;
+				
+				4'b1100:
+					drive_index <= 3'd2;
+				
+				4'b1010:
+					drive_index <= 3'd1;
+				
+				4'b1001:
+					drive_index <= 3'd0;
+
+				default:
+					drive_index <= 3'd0;
+				endcase
+			end
 		end
 	end
 end
@@ -293,16 +300,24 @@ begin
 		begin
 //			Set Writes
 			r_w_active <= 1'b1;
-			case (drive_index)
-				3'd0:
-					WR[0] <= 1'b1;
-				3'd1:
-					WR[1] <= 1'b1;
-				3'd2:
-					WR[2] <= 1'b1;
-				3'd3:
-					WR[3] <= 1'b1;
-			endcase
+			if (ADDRESS[1:0]==2'b00)
+				case (drive_index)
+					3'd0:
+						WR[0] <= 1'b1;
+					3'd1:
+						WR[1] <= 1'b1;
+					3'd2:
+						WR[2] <= 1'b1;
+					3'd3:
+						WR[3] <= 1'b1;
+				endcase 
+			else 
+			begin // FLYNN : if not a command, write the register in ALL fdc components.
+				WR[0] <= 1'b1;
+				WR[1] <= 1'b1;
+				WR[2] <= 1'b1;
+				WR[3] <= 1'b1;
+			end
 		end
 
 //		Synchronus rising edge of read
@@ -353,7 +368,7 @@ assign	selected_INTRQ	=	(drive_index == 3'd0)	?	INTRQ[0]:
 							(drive_index == 3'd3)	?	INTRQ[3]:
 														1'b0;
 
-assign	NMI_09	=	DENSITY & selected_INTRQ;				// Send NMI if Double Density (Halt Mode)
+assign	NMI_09	=  DENSITY & selected_INTRQ;				// DENSITY is just the IRQ mask : Send NMI if allowed (Halt Mode)
 
 //	HALT from disk controller
 //	Selected DRQ
@@ -363,7 +378,7 @@ assign	selected_DRQ	=	(drive_index == 3'd0)	?	DRQ[0]:
 							(drive_index == 3'd1)	?	DRQ[1]:
 							(drive_index == 3'd2)	?	DRQ[2]:
 							(drive_index == 3'd3)	?	DRQ[3]:
-														1'b1;
+														1'b0;
 
 assign	HALT	=	HALT_EN & ~selected_DRQ;
 
@@ -386,6 +401,8 @@ reg       drive_wp[4];
 reg       [3:0] drive_ready  = 4'B0;
 reg       [3:0] double_sided = 4'B0;
 
+wire [3:0] img_mounted_d ;
+
 // As drives are mounted in MISTer this logic saves the write protect and generates ready for
 // changing drives to the wd1793.
 // This can also get the disk size to properly handle DS drives - TBD
@@ -394,38 +411,51 @@ reg       [3:0] double_sided = 4'B0;
 
 // Drive 0
 
-always @(negedge img_mounted[0])
+always @(negedge CLK)
 begin
-	drive_wp[0] <= img_readonly;
-	drive_ready[0] <= 1'b1;
-	double_sided[0]<= img_size > 20'd368600;//20'd368640;
+   img_mounted_d[0] <= img_mounted[0] ;
+	if (img_mounted[0] & ~img_mounted_d[0]) begin
+		drive_wp[0] <= img_readonly;
+		drive_ready[0] <= (img_size!=20'd0) ; 
+		// drive_ready[0] <= 1'b1;
+		double_sided[0]<= img_size > 20'd368600;//20'd368640;
+	end
 end
 
 // Drive 1
 
-always @(negedge img_mounted[1])
+always @(negedge CLK)
 begin
-	drive_wp[1] <= img_readonly;
-	drive_ready[1] <= 1'b1;
-	double_sided[1]<= img_size > 20'd368600;//20'd368640;
+   img_mounted_d[1] <= img_mounted[1] ;
+	if (img_mounted[1] & ~img_mounted_d[1]) begin
+		drive_wp[1] <= img_readonly;
+		drive_ready[1] <= (img_size!=20'd0) ; 
+		double_sided[1]<= img_size > 20'd368600;//20'd368640;
+	end
 end
 
 // Drive 2
 
-always @(negedge img_mounted[2])
+always @(negedge CLK)
 begin
-	drive_wp[2] <= img_readonly;
-	drive_ready[2] <= 1'b1;
-	double_sided[2]<= img_size > 20'd368600;//20'd368640;
+   img_mounted_d[2] <= img_mounted[2] ;
+	if (img_mounted[2] & ~img_mounted_d[2]) begin
+		drive_wp[2] <= img_readonly;
+		drive_ready[2] <= (img_size!=20'd0) ; 
+		double_sided[2]<= img_size > 20'd368600;//20'd368640;
+	end
 end
 
 // Drive 3
 
-always @(negedge img_mounted[3])
+always @(negedge CLK)
 begin
-	drive_wp[3] <= img_readonly;
-	drive_ready[3] <= 1'b1;
-	//double_sided[3]<= img_size > 20'd368600;//20'd368640;
+   img_mounted_d[3] <= img_mounted[3] ;
+	if (img_mounted[3] & ~img_mounted_d[3]) begin
+		drive_wp[3] <= img_readonly;
+		drive_ready[3] <= (img_size!=20'd0) ; 
+		double_sided[3]<= img_size > 20'd368600;//20'd368640;
+	end
 end
 
 
@@ -442,6 +472,7 @@ wd1793 #(1,1) coco_wd1793_0
 	.dout(dout[0]),
 	.drq(DRQ[0]),
 	.intrq(INTRQ[0]),
+	.dragon(dragon),
 
 	.img_mounted(img_mounted[0]),
 	.img_size(img_size),
@@ -460,8 +491,8 @@ wd1793 #(1,1) coco_wd1793_0
 
 	.size_code(3'd5),		// 5 is 18 sector x 256 bits COCO standard
 	.layout(~double_sided[0]),	// 0 = Track-Side-Sector, 1 - Side-Track-Sector
-	.side(double_sided[0] & DRIVE_SEL_EXT[3]),
-	.ready(drive_ready[0]),
+	.coco_side(double_sided[0] & DRIVE_SEL_EXT[3]), // CoCo specific floppy side signal
+ 	.ready(drive_ready[0]),
 
 	.input_active(0),
 	.input_addr(0),
@@ -483,6 +514,7 @@ wd1793 #(1,0) coco_wd1793_1
 	.dout(dout[1]),
 	.drq(DRQ[1]),
 	.intrq(INTRQ[1]),
+	.dragon(dragon),
 
 	.img_mounted(img_mounted[1]),
 	.img_size(img_size),
@@ -501,7 +533,7 @@ wd1793 #(1,0) coco_wd1793_1
 
 	.size_code(3'd5),		// 5 is 18 sector x 256 bits COCO standard
 	.layout(~double_sided[1]),	// 0 = Track-Side-Sector, 1 - Side-Track-Sector
-	.side(double_sided[1] & DRIVE_SEL_EXT[3]),
+	.coco_side(double_sided[1] & DRIVE_SEL_EXT[3]), // CoCo specific floppy side signal
 	.ready(drive_ready[1]),
 
 	.input_active(0),
@@ -524,6 +556,7 @@ wd1793 #(1,0) coco_wd1793_2
 	.dout(dout[2]),
 	.drq(DRQ[2]),
 	.intrq(INTRQ[2]),
+	.dragon(dragon),
 
 	.img_mounted(img_mounted[2]),
 	.img_size(img_size),
@@ -542,7 +575,7 @@ wd1793 #(1,0) coco_wd1793_2
 
 	.size_code(3'd5),		// 5 is 18 sector x 256 bits COCO standard
 	.layout(~double_sided[2]),	// 0 = Track-Side-Sector, 1 - Side-Track-Sector
-	.side(double_sided[2] & DRIVE_SEL_EXT[3]),
+	.coco_side(double_sided[2] & DRIVE_SEL_EXT[3]), // CoCo specific floppy side signal
 	.ready(drive_ready[2]),
 
 	.input_active(0),
@@ -565,6 +598,7 @@ wd1793 #(1,0) coco_wd1793_3
 	.dout(dout[3]),
 	.drq(DRQ[3]),
 	.intrq(INTRQ[3]),
+	.dragon(dragon),
 
 	.img_mounted(img_mounted[3]),
 	.img_size(img_size),
@@ -582,8 +616,8 @@ wd1793 #(1,0) coco_wd1793_3
 	.wp(drive_wp[3]),
 
 	.size_code(3'd5),		// 5 is 18 sector x 256 bits COCO standard
-	.layout(1'b1),			// 0 = Track-Side-Sector, 1 - Side-Track-Sector
-	.side(1'b0),			// DS can not be supported for drive 3.
+	.layout((dragon) ? ~double_sided[3] : 1'b1),			// 0 = Track-Side-Sector, 1 - Side-Track-Sector
+	.coco_side(1'b0),			// CoCo only : DS can not be supported for drive 3.
 	.ready(drive_ready[3]),
 
 	.input_active(0),
